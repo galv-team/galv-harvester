@@ -1,0 +1,61 @@
+name: CI Tests
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    env:
+      GALV_HARVESTER_TEST_PATH: .test-data/test-suite-small
+    steps:
+      - uses: actions/checkout@v3
+      # Enable tmate debugging of manually-triggered workflows if the input option was provided
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+
+      - name: Install smbclient
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y smbclient
+
+      - name: Restore cached test suite
+        id: cache-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: ${{ env.GALV_HARVESTER_TEST_PATH }}
+          key: liionsden-test-suite
+
+      - name: Download test suite
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        env:
+          LIIONSDEN_SMB_PATH: ${{ secrets.LIIONSDEN_SMB_PATH }}
+          LIIONSDEN_SMB_USERNAME: ${{ secrets.LIIONSDEN_SMB_USERNAME}}
+          LIIONSDEN_SMB_PASSWORD: ${{ secrets.LIIONSDEN_SMB_PASSWORD}}
+        run: |
+          sudo mkdir -p $GALV_HARVESTER_TEST_PATH 
+          cd $GALV_HARVESTER_TEST_PATH
+          sudo smbget -R $LIIONSDEN_SMB_PATH/test-suite-small -U "$LIIONSDEN_SMB_USERNAME%$LIIONSDEN_SMB_PASSWORD"
+
+      - name: Cache test suite
+        id: cache-save
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v3
+        with:
+          path: ${{ env.GALV_HARVESTER_TEST_PATH }}
+          key: ${{ steps.cache-restore.outputs.cache-primary-key }}
+
+      - name: Setup docker-compose
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y docker-compose
+
+      - name: Run tests
+        run: docker-compose run --rm harvester_test
