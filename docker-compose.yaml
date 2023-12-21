@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  harvester:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    volumes:
+      - .:/usr/harvester
+      - ./.harvester:/harvester_files
+    working_dir: /usr/harvester
+    restart: unless-stopped
+#    entrypoint: /usr/local/bin/python3
+#    command: --url http://localhost:1088/ --name "harvey" --credentials env --team_id 1 --monitor_path /usr/test_data/ --run_foreground --restart
+    command: "tail -F anything"
+
+  harvester_test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: "no"
+    volumes:
+      - .:/usr/harvester
+      - ./.test-data/test-suite-small:/usr/test_data
+#    entrypoint: python3
+#    command: -m unittest discover -s /usr/harvester/test

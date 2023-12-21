@@ -7,9 +7,8 @@ from unittest.mock import patch
 import os
 from pathlib import Path
 
-from harvester.harvester.parse.input_file import InputFile
-import harvester.harvester.run
-import harvester.harvester.harvest
+import harvester.run
+import harvester.harvest
 
 def get_test_file_path():
     return os.getenv('TEST_DIR', "/usr/test_data")
@@ -26,6 +25,7 @@ class ConfigResponse:
             "sleep_time": 0,
             "monitored_paths": [
                 {
+                    "uuid": "1f6852da-3d2d-46ce-a6c6-70b602fd0e84",
                     "path": get_test_file_path(),
                     "stable_time": 0,
                     "regex": "^(?!.*\\.skip$).*$",
@@ -159,11 +159,11 @@ def fail(e, *kwargs):
 
 class TestHarvester(unittest.TestCase):
     @patch('requests.get')
-    @patch('harvester.harvester.api.logger')
-    @patch('harvester.harvester.run.logger')
-    @patch('harvester.harvester.api.get_settings_file')
-    @patch('harvester.harvester.settings.get_settings_file')
-    @patch('harvester.harvester.settings.get_logfile')
+    @patch('harvester.api.logger')
+    @patch('harvester.run.logger')
+    @patch('harvester.api.get_settings_file')
+    @patch('harvester.settings.get_settings_file')
+    @patch('harvester.settings.get_logfile')
     def test_config_update(
             self,
             mock_settings_log,
@@ -179,27 +179,30 @@ class TestHarvester(unittest.TestCase):
         mock_api_logger.error = fail
         mock_run_logger.error = fail
         mock_get.return_value = ConfigResponse()
-        harvester.harvester.run.update_config()
+        harvester.run.update_config()
         if not os.path.isfile(mock_settings_file()):
             raise AssertionError(f"Expected JSON file '{mock_settings_file()}' not found")
 
         os.remove(mock_settings_file())
 
-    @patch('harvester.harvester.run.report_harvest_result')
-    @patch('harvester.harvester.run.import_file')
-    @patch('harvester.harvester.run.logger')
-    def test_harvest_path(self, mock_logger, mock_import, mock_report):
+    @patch('harvester.run.report_harvest_result')
+    @patch('harvester.run.import_file')
+    @patch('harvester.run.logger')
+    @patch('harvester.settings.get_settings')
+    def test_harvest_path(self, mock_settings, mock_logger, mock_import, mock_report):
+        mock_settings.return_value = ConfigResponse().json()
         # Create an unparsable file in the test set
         Path(os.path.join(get_test_file_path(), 'unparsable.foo')).touch(exist_ok=True)
         Path(os.path.join(get_test_file_path(), 'skipped_by_regex.skip')).touch(exist_ok=True)
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(200, {'state': 'STABLE'})
         mock_import.return_value = True
-        harvester.harvester.run.harvest_path(Path(get_test_file_path()))
+        harvester.run.harvest_path(ConfigResponse().json()['monitored_paths'][0])
         files = []
         for c in mock_import.call_args_list:
-            if c.args[1] not in files:
-                files.append(c.args[1])
+            f = c.args[0]
+            if f not in files:
+                files.append(c.args)
         if len(files) != 5:
             raise AssertionError(f"Did not find 5 files in path {get_test_file_path()}")
         for f in files:
@@ -213,16 +216,16 @@ class TestHarvester(unittest.TestCase):
                 if not ok:
                     raise AssertionError(f"{f} did not make call with 'task'={task}")
 
-    @patch('harvester.harvester.harvest.report_harvest_result')
-    @patch('harvester.harvester.harvest.logger')
-    @patch('harvester.harvester.settings.get_settings')
+    @patch('harvester.harvest.report_harvest_result')
+    @patch('harvester.harvest.logger')
+    @patch('harvester.settings.get_settings')
     def import_file(self, filename, mock_settings, mock_logger, mock_report):
         mock_settings.return_value = ConfigResponse().json()
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(
             200, {'upload_info': {'last_record_number': 0, 'columns': []}}
         )
-        if not harvester.harvester.harvest.import_file(get_test_file_path(), filename):
+        if not harvester.harvest.import_file(os.path.join(get_test_file_path(), filename), mock_settings.monitored_paths[0]):
             raise AssertionError(f"Import failed for {get_test_file_path()}/{filename}")
         self.validate_report_calls(mock_report.call_args_list)
 
