@@ -22,5 +22,5 @@ services:
     volumes:
       - .:/usr/harvester
       - ./.test-data/test-suite-small:/usr/test_data
-#    entrypoint: python3
-#    command: -m unittest discover -s /usr/harvester/test
+    entrypoint: python3
+    command: -m unittest discover -s /usr/harvester/test
