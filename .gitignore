@@ -13,36 +13,11 @@ env
 
 .idea/
 
-.run/
-
-.test-data/
-
-frontend/src/demo_matlab_code.m
+.test-data/**/*.*
+!.test-data/**/*.csv
 
 **/.env.*
-dev.sh
-backend/backend_django/django_celery_beat.schedulersDatabaseScheduler
-
 .harvester/
-
-*.pptx
-
-docker-compose.override.yml
-backend/backend_django/galv/migrations/*.py
-!backend/backend_django/galv/migrations/__init__.py
-
-docs/build/
-
-.certs/
-
-.vhost/
-
-.static_files/
-
-node_modules/
-
-.DS_Store
-
-.tmp/test/
-
 .schema/
+docs/build/
+*.pptx

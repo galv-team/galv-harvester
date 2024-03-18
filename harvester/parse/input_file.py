@@ -128,6 +128,11 @@ class InputFile:
             raise
 
     def load_data(self, file_path, available_desired_columns):
+        """
+        This method should be implemented by the subclass.
+
+        It should return a generator that yields a dictionary of column_name => value
+        """
         raise UnsupportedFileTypeError()
 
     def get_data_labels(self):
@@ -140,4 +145,11 @@ class InputFile:
         raise UnsupportedFileTypeError()
 
     def load_metadata(self):
+        """
+            returns a tuple of (metadata, column_info)
+
+            metadata is a dictionary of metadata keys to values
+
+            column_info is a dictionary of column names to dictionaries of column info
+        """
         raise UnsupportedFileTypeError()

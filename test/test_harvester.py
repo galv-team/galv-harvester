@@ -199,12 +199,13 @@ class TestHarvester(unittest.TestCase):
         mock_import.return_value = True
         harvester.run.harvest_path(ConfigResponse().json()['monitored_paths'][0])
         files = []
+        expected_file_count = 8
         for c in mock_import.call_args_list:
             f = c.args[0]
             if f not in files:
                 files.append(c.args)
-        if len(files) != 5:
-            raise AssertionError(f"Did not find 5 files in path {get_test_file_path()}")
+        if len(files) != expected_file_count:
+            raise AssertionError(f"Did not find {expected_file_count} files in path {get_test_file_path()}")
         for f in files:
             for task in ['file_size', 'import']:
                 ok = False
@@ -219,7 +220,7 @@ class TestHarvester(unittest.TestCase):
     @patch('harvester.harvest.report_harvest_result')
     @patch('harvester.harvest.logger')
     @patch('harvester.settings.get_settings')
-    def import_file(self, filename, mock_settings, mock_logger, mock_report):
+    def import_file(self, filename, mock_settings, mock_logger, mock_report, additional_checks=None):
         mock_settings.return_value = ConfigResponse().json()
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(
@@ -228,6 +229,9 @@ class TestHarvester(unittest.TestCase):
         if not harvester.harvest.import_file(os.path.join(get_test_file_path(), filename), mock_settings.monitored_paths[0]):
             raise AssertionError(f"Import failed for {get_test_file_path()}/{filename}")
         self.validate_report_calls(mock_report.call_args_list)
+        if additional_checks:
+            additional_checks(mock_report.call_args_list)
+
 
     def validate_report_calls(self, calls):
         begun = False
@@ -257,6 +261,21 @@ class TestHarvester(unittest.TestCase):
 
     # def test_import_txt(self):
     #     self.import_file('TPG1+-+Cell+15+-+002.txt')
+
+    def test_import_csv(self):
+        self.import_file('headered.csv')
+        self.import_file('headerless.csv')
+
+        def validate_preamble(calls):
+            for c in calls:
+                if c.kwargs['content']['task'] == 'import' and c.kwargs['content']['status'] == 'begin':
+                    if c.kwargs['content']['core_metadata'].get('preamble') is None:
+                        raise AssertionError(f"Expected import report to contain 'preamble'")
+                    else:
+                        return
+            raise AssertionError(f"Could not find import report with 'preamble'")
+
+        self.import_file('preamble.csv', additional_checks=validate_preamble)
 
 
 if __name__ == '__main__':

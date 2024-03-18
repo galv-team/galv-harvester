@@ -1,0 +1,12 @@
+# This dataset is taken from Wikipedia's page on Comma-separated values
+# https://en.wikipedia.org/wiki/Comma-separated_values
+# It is a simple dataset with 5 rows and 5 columns
+# The first row is the header row
+# The first column is the year, the second column is the make, the third column is the model, the fourth column is the description, and the fifth column is the price
+# We've added this preamble to check whether the dataset is being read correctly
+Year,Make,Model,Description,Price
+1997,Ford,E350,"ac, abs, moon",3000.00
+1999,Chevy,"Venture ""Extended Edition""","",4900.00
+1999,Chevy,"Venture ""Extended Edition, Very Large""","",5000.00
+1996,Jeep,Grand Cherokee,"MUST SELL!
+air, moon roof, loaded",4799.00

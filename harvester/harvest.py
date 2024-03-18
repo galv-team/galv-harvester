@@ -18,6 +18,7 @@ from .parse.maccor_input_file import (
     MaccorExcelInputFile,
     MaccorRawInputFile,
 )
+from .parse.delimited_input_file import DelimitedInputFile
 
 from .settings import get_logger, get_setting, get_standard_units, get_standard_columns
 from .api import report_harvest_result
@@ -31,6 +32,7 @@ registered_input_files = [
     MaccorInputFile,
     MaccorExcelInputFile,
     MaccorRawInputFile,
+    DelimitedInputFile  # Should be last because it processes files line by line and accepts anything table-like
 ]
 
 
@@ -49,6 +51,11 @@ def serialize_datetime(v):
         return [serialize_datetime(x) for x in v]
     return v
 
+def get_test_date(metadata):
+    """
+    Get the test date from the metadata
+    """
+    return serialize_datetime(metadata.get('Date of Test'))
 
 def get_import_file_handler(file_path: str):
     """
@@ -102,7 +109,7 @@ def import_file(path: str, monitored_path: dict) -> bool:
                 'status': 'begin',
                 'core_metadata': serialize_datetime(core_metadata),
                 'extra_metadata': serialize_datetime(extra_metadata),
-                'test_date': serialize_datetime(core_metadata['Date of Test']),
+                'test_date': get_test_date(core_metadata),
                 'parser': input_file.__class__.__name__
             }
         )
@@ -171,7 +178,7 @@ def import_file(path: str, monitored_path: dict) -> bool:
                     'task': 'import',
                     'status': 'in_progress',
                     'data': [v for v in column_data.values()],
-                    'test_date': serialize_datetime(core_metadata['Date of Test'])
+                    'test_date': get_test_date(core_metadata)
                 })
                 if report is None:
                     logger.error(f"API Error")
@@ -229,7 +236,7 @@ def import_file(path: str, monitored_path: dict) -> bool:
             'status': 'in_progress',
             'data': [v for v in column_data.values()],
             'labels': tuple(input_file.get_data_labels()),
-            'test_date': serialize_datetime(core_metadata['Date of Test'])
+            'test_date': get_test_date(core_metadata)
         })
         if report is None:
             logger.error(f"API Error")
