@@ -13,6 +13,7 @@ services:
 #    entrypoint: /usr/local/bin/python3
 #    command: --url http://localhost:1088/ --name "harvey" --credentials env --team_id 1 --monitor_path /usr/test_data/ --run_foreground --restart
     command: "tail -F anything"
+    network_mode: "host"
 
   harvester_test:
     build:

@@ -173,6 +173,7 @@ def create_monitored_path(
                     'regex': monitor_path_regex,
                     'harvester': harvester_uuid,
                     'team': team['id'],
+                    'active': True
                 },
                 headers={
                     'Authorization': f"Bearer {api_token}"
@@ -368,7 +369,7 @@ def register(
 @click.option('--lab_id', type=int, help="Id of the Lab to assign the Harvester to. Only required if you administrate multiple Labs.")
 @click.option('--team_id', type=int, help="Id of the Team to create a Monitored Path for. Only required if you administrate multiple Teams and wish to create a monitored path.")
 @click.option('--monitor_path', type=str, help="Path to harvest files from.")
-@click.option('--monitor_path_regex', type=str, help="Regex to match files to harvest. Other options can be specified using the frontend.", default=".*")
+@click.option('--monitor_path_regex', type=str, help="Regex to match files to harvest. Other options can be specified using the frontend.")
 @click.option(
     '--run_foreground',
     is_flag=True,
