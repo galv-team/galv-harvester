@@ -150,16 +150,15 @@ def create_monitored_path(
             regex_ok = monitor_path_regex is not None
             while not regex_ok:
                 monitor_path_regex = input(
-                    "Enter a regex to match files in this directory to monitor, or leave blank to monitor all files: ")
+                    "Enter a regex to match files in this directory to monitor, or leave blank to monitor all files:"
+                )
                 if monitor_path_regex == "":
                     monitor_path_regex = ".*"
+                try:
+                    re.compile(monitor_path_regex)
                     regex_ok = True
-                else:
-                    try:
-                        re.compile(monitor_path_regex)
-                        regex_ok = True
-                    except re.error as e:
-                        click.echo(f"Invalid regex -- {e}", err=True)
+                except re.error as e:
+                    click.echo(f"Invalid regex -- {e}", err=True)
             break
 
     if monitor_path is not None:
@@ -185,9 +184,9 @@ def create_monitored_path(
 
 def register(
         url: str = None, name: str = None, api_token: str = None,
-        credentials: str = None, lab_id: int = None, team_id: int = None,
+        lab_id: int = None, team_id: int = None,
         monitor_path: str = None, monitor_path_regex: str = ".*",
-        run_foreground: bool = False
+        run_foreground: bool = None
 ):
     """
     Guide a user through the setup process.
@@ -198,10 +197,20 @@ def register(
             url is not None or
             name is not None or
             api_token is not None or
-            credentials is not None or
             lab_id is not None or
-            monitor_path is not None
+            monitor_path is not None or
+            os.getenv("GALV_HARVESTER_SKIP_WIZARD", False)
     )
+    # Load from environment variables if not specified
+    url = url or os.getenv("GALV_HARVESTER_SERVER_URL")
+    name = name or os.getenv("GALV_HARVESTER_NAME")
+    api_token = api_token or os.getenv("GALV_HARVESTER_API_TOKEN")
+    lab_id = lab_id or os.getenv("GALV_HARVESTER_LAB_ID")
+    team_id = team_id or os.getenv("GALV_HARVESTER_TEAM_ID")
+    monitor_path = monitor_path or os.getenv("GALV_HARVESTER_MONITOR_PATH")
+    monitor_path_regex = monitor_path_regex or os.getenv("GALV_HARVESTER_MONITOR_PATH_REGEX")
+    run_foreground = run_foreground or os.getenv("GALV_HARVESTER_RUN_FOREGROUND", False)
+
     # Check we can connect to the API
     if url is not None:
         url = append_slash(url)
@@ -220,27 +229,8 @@ def register(
     labs_administered = []
     while True:
         if not specified:
-            api_token = input("Enter your API token or leave blank to use username/password authorisation instead: ")
-            if api_token == "":
-                username = input("Enter your username: ")
-                password = getpass()
-                credentials = f"{username}:{password}"
+            api_token = input("Enter your API token: ")
         try:
-            if api_token is None and credentials is not None:
-                try:
-                    auth_str = base64.b64encode(bytes(credentials, 'utf-8'))
-                    basic_auth = query(
-                        f"{url}login/",
-                        {},
-                        headers={"Authorization": f"Basic {auth_str.decode('utf-8')}"}
-                    )
-                    api_token = basic_auth['token']
-                except BaseException as e:
-                    click.echo(f"Unable to authenticate using username/password -- {e}", err=True)
-                    if specified:
-                        exit(1)
-                    continue
-
             labs = query(f"{url}labs/", headers={'Authorization': f"Bearer {api_token}"})
             labs_administered = [l for l in labs['results'] if l['permissions']['write']]
         except BaseException as e:
@@ -248,7 +238,7 @@ def register(
             if specified:
                 exit(1)
         if len(labs_administered) == 0:
-            click.echo("This user does not administer any labs. Please try another API key.", err=True)
+            click.echo("This user does not administer any labs. Please try an API key from a different user.", err=True)
             if specified:
                 exit(1)
             continue
@@ -365,7 +355,6 @@ def register(
 @click.option('--url', type=str, help="API URL to register harvester with.")
 @click.option('--name', type=str, help="Name for the harvester.")
 @click.option('--api_token', type=str, help="Your API token. You must have admin access to at least one Lab.")
-@click.option('--credentials', type=str, help="If provided in the form username:password, will attempt to create an API_token. Enter the special value env to fetch credentials from the environment variables DJANGO_SUPERUSER_USERNAME:DJANGO_SUPERUSER_PASSWORD.")
 @click.option('--lab_id', type=int, help="Id of the Lab to assign the Harvester to. Only required if you administrate multiple Labs.")
 @click.option('--team_id', type=int, help="Id of the Team to create a Monitored Path for. Only required if you administrate multiple Teams and wish to create a monitored path.")
 @click.option('--monitor_path', type=str, help="Path to harvest files from.")
@@ -384,10 +373,12 @@ def register(
     help="Ignore other options and run harvester if config file already exists."
 )
 def click_wrapper(
-        url: str, name: str, api_token: str, credentials: str, lab_id: int, team_id: int,
+        url: str, name: str, api_token: str, lab_id: int, team_id: int,
         monitor_path: str, monitor_path_regex: str,
         run_foreground: bool, restart: bool
 ):
+    restart = restart or os.getenv("GALV_HARVESTER_RESTART", False)
+
     if restart:
         click.echo("Attempting to restart harvester.")
         # Check whether a config file already exists, if so, use it
@@ -400,10 +391,8 @@ def click_wrapper(
             click.echo("")
 
     click.echo("Welcome to Harvester setup.")
-    if credentials == 'env':
-        credentials = f"{os.getenv('DJANGO_SUPERUSER_USERNAME', 'admin')}:{os.getenv('DJANGO_SUPERUSER_PASSWORD')}"
     register(
-        url=url, name=name, api_token=api_token, credentials=credentials, lab_id=lab_id, team_id=team_id,
+        url=url, name=name, api_token=api_token, lab_id=lab_id, team_id=team_id,
         monitor_path=monitor_path, monitor_path_regex=monitor_path_regex,
         run_foreground=run_foreground
     )
