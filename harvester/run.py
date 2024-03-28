@@ -9,7 +9,7 @@ import time
 from .parse.exceptions import UnsupportedFileTypeError
 from .settings import get_logger, get_setting
 from .api import report_harvest_result, update_config
-from .harvest import import_file, get_import_file_handler
+from .harvest import HarvestProcessor
 
 logger = get_logger(__file__)
 
@@ -55,7 +55,7 @@ def harvest_path(monitored_path: dict):
                     logger.debug(f"Skipping {file_path} as it does not match regex {regex}")
                     continue
                 try:
-                    get_import_file_handler(full_path)
+                    file = HarvestProcessor(full_path, monitored_path)
                 except UnsupportedFileTypeError:
                     logger.debug(f"Skipping unsupported file {file_path}")
                     continue
@@ -75,19 +75,20 @@ def harvest_path(monitored_path: dict):
                         logger.info(f"Server assigned status '{status}'")
                         if status in ['STABLE', 'RETRY IMPORT']:
                             logger.info(f"Parsing file {file_path}")
-                            if import_file(full_path, monitored_path):
+                            try:
+                                file.harvest()
                                 report_harvest_result(
                                     path=full_path,
                                     monitored_path_uuid=monitored_path.get('uuid'),
-                                    content={'task': 'import', 'status': 'complete'}
+                                    content={'task': 'import', 'stage': 'harvest complete'}
                                 )
                                 logger.info(f"Successfully parsed file {file_path}")
-                            else:
+                            except BaseException as e:
                                 logger.warn(f"FAILED parsing file {file_path}")
                                 report_harvest_result(
                                     path=full_path,
                                     monitored_path_uuid=monitored_path.get('uuid'),
-                                    content={'task': 'import', 'status': 'failed'}
+                                    content={'task': 'import', 'stage': 'harvest failed'}
                                 )
                 except BaseException as e:
                     logger.error(f"{e.__class__.__name__}: {e}")

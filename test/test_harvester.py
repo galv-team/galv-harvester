@@ -75,13 +75,17 @@ class ConfigResponse:
                 {
                     "id": 11,
                     "name": "Frequency"
+                },
+                {
+                    "id": 12,
+                    "name": "Unknown"
                 }
             ],
             "standard_columns": [
                 {
                     "id": 1,
                     "name": "Unknown",
-                    "unit": None
+                    "unit": 12
                 },
                 {
                     "id": 2,
@@ -186,72 +190,99 @@ class TestHarvester(unittest.TestCase):
         os.remove(mock_settings_file())
 
     @patch('harvester.run.report_harvest_result')
-    @patch('harvester.run.import_file')
+    @patch('harvester.run.HarvestProcessor', autospec=True)
     @patch('harvester.run.logger')
     @patch('harvester.settings.get_settings')
-    def test_harvest_path(self, mock_settings, mock_logger, mock_import, mock_report):
+    def test_harvest_path(self, mock_settings, mock_logger, mock_processor, mock_report):
         mock_settings.return_value = ConfigResponse().json()
         # Create an unparsable file in the test set
         Path(os.path.join(get_test_file_path(), 'unparsable.foo')).touch(exist_ok=True)
         Path(os.path.join(get_test_file_path(), 'skipped_by_regex.skip')).touch(exist_ok=True)
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(200, {'state': 'STABLE'})
-        mock_import.return_value = True
         harvester.run.harvest_path(ConfigResponse().json()['monitored_paths'][0])
         files = []
-        expected_file_count = 8
-        for c in mock_import.call_args_list:
+        expected_file_count = 9
+        for c in mock_processor.call_args_list:
             f = c.args[0]
             if f not in files:
                 files.append(c.args)
         if len(files) != expected_file_count:
-            raise AssertionError(f"Did not find {expected_file_count} files in path {get_test_file_path()}")
+            raise AssertionError(f"Found {len(files)} instead of {expected_file_count} files in path {get_test_file_path()}")
         for f in files:
             for task in ['file_size', 'import']:
                 ok = False
                 for c in mock_report.call_args_list:
                     if c.kwargs['content']['task'] == task:
-                        if not task == 'import' or c.kwargs['content']['status'] == 'complete':
+                        if not task == 'import' or c.kwargs['content']['stage'] == 'harvest complete':
                             ok = True
                             break
                 if not ok:
                     raise AssertionError(f"{f} did not make call with 'task'={task}")
 
+    @patch('requests.post')
     @patch('harvester.harvest.report_harvest_result')
     @patch('harvester.harvest.logger')
     @patch('harvester.settings.get_settings')
-    def import_file(self, filename, mock_settings, mock_logger, mock_report, additional_checks=None):
+    def import_file(self, filename, mock_settings, mock_logger, mock_report, mock_post, additional_checks=None):
         mock_settings.return_value = ConfigResponse().json()
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(
-            200, {'upload_info': {'last_record_number': 0, 'columns': []}}
+            200,
+            # An amalgam of the expected report content for different calls
+            {
+                'upload_info': {'last_record_number': 0, 'columns': []},
+                'upload_urls': [
+                    {'url': 'http://localhost', 'fields': []},
+                    {'url': 'http://localhost', 'fields': []},
+                    {'url': 'http://localhost', 'fields': []}
+                ]
+            }
         )
-        if not harvester.harvest.import_file(os.path.join(get_test_file_path(), filename), mock_settings.monitored_paths[0]):
-            raise AssertionError(f"Import failed for {get_test_file_path()}/{filename}")
+        mock_post.return_value = JSONResponse(204, {})
+        harvester.harvest.HarvestProcessor(
+                os.path.join(get_test_file_path(), filename), mock_settings.monitored_paths[0]
+        ).harvest()
         self.validate_report_calls(mock_report.call_args_list)
         if additional_checks:
             additional_checks(mock_report.call_args_list)
 
-
     def validate_report_calls(self, calls):
-        begun = False
+        stages = ['file metadata', 'column metadata', 'get upload urls', 'upload complete']
+        upload_fired = False
         for c in calls:
             if not 'content' in c.kwargs:
-                raise AssertionError(f"Report made with no content")
-            if not begun:
-                if c.kwargs['content']['status'] != 'begin':
-                    raise AssertionError(f"Expected result reports to start with status='begin'")
-                if 'core_metadata' not in c.kwargs['content']:
-                    raise AssertionError(f"Expected result report to contain core_metadata")
-                begun = True
-                continue
-            if c.kwargs['content']['status'] != 'in_progress':
-                raise AssertionError(f"Expected result report status to be 'in_progress'")
-            if not c.kwargs['content']['data']:
-                raise AssertionError(f"Expected result report to contain 'data'")
-            row = c.kwargs['content']['data'][0]
-            if not 'values' in row:
-                raise AssertionError(f"'data' contains no 'values' field")
+                if 'files' in c.kwargs and not upload_fired:
+                    upload_fired = True
+                else:
+                    if upload_fired:
+                        raise AssertionError(f"Received multiple upload calls")
+                    raise AssertionError(f"Report made with no content")
+
+            if c.kwargs['content']['task'] == 'import':
+                stage = stages.pop(0)
+                s = c.kwargs['content']['stage']
+                if s != stage:
+                    raise AssertionError(f"Expected import report to have stage {stage}, received {s}")
+
+                if s == 'file_metadata':
+                    for k in ['core_metadata', 'extra_metadata', 'test_date', 'parser']:
+                        if k not in c.kwargs['content']:
+                            raise AssertionError(f"Expected file_metadata report to contain {k}")
+                elif s == 'column_metadata':
+                    if not c.kwargs['content']['metadata']:
+                        raise AssertionError(f"Expected column_metadata report to contain metadata")
+                elif s == 'get_upload_params':
+                    if not c.kwargs['content']['data_row_count']:
+                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
+                    if not c.kwargs['content']['data_partition_count']:
+                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
+                elif s == 'upload_complete':
+                    if not c.kwargs['content']['successes']:
+                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
+                    if not c.kwargs['content']['errors']:
+                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
+
 
     def test_import_mpr(self):
         self.import_file('adam_3_C05.mpr')
@@ -268,7 +299,7 @@ class TestHarvester(unittest.TestCase):
 
         def validate_preamble(calls):
             for c in calls:
-                if c.kwargs['content']['task'] == 'import' and c.kwargs['content']['status'] == 'begin':
+                if c.kwargs['content']['task'] == 'import' and c.kwargs['content']['stage'] == 'file metadata':
                     if c.kwargs['content']['core_metadata'].get('preamble') is None:
                         raise AssertionError(f"Expected import report to contain 'preamble'")
                     else:

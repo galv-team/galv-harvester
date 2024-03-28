@@ -14,7 +14,7 @@ logger = get_logger(__file__)
 
 def report_harvest_result(
         path: os.PathLike|str,
-        monitored_path_uuid: int,
+        monitored_path_uuid: str,
         content=None,
         error: BaseException = None
 ):
@@ -49,7 +49,7 @@ def report_harvest_result(
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")
         out = None
-    logger.info(f"API call finished in {time.time() - start}")
+    logger.info(f"API call finished in {round(time.time() - start, 2)}")
     return out
 
 

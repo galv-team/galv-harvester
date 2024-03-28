@@ -3,12 +3,14 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import datetime
+import shutil
+import pandas
 import os
+import tempfile
 import time
-import sys
 import json
-
-from .utils import NpEncoder
+import dask.dataframe
+import requests
 
 from .parse.exceptions import UnsupportedFileTypeError
 from .parse.ivium_input_file import IviumInputFile
@@ -20,241 +22,319 @@ from .parse.maccor_input_file import (
 )
 from .parse.delimited_input_file import DelimitedInputFile
 
-from .settings import get_logger, get_setting, get_standard_units, get_standard_columns
+from .settings import get_logger, get_standard_units, get_standard_columns, VERSION
 from .api import report_harvest_result
 
 logger = get_logger(__file__)
 
+class HarvestProcessor:
 
-registered_input_files = [
-    BiologicMprInputFile,
-    IviumInputFile,
-    MaccorInputFile,
-    MaccorExcelInputFile,
-    MaccorRawInputFile,
-    DelimitedInputFile  # Should be last because it processes files line by line and accepts anything table-like
-]
+    registered_input_files = [
+        BiologicMprInputFile,
+        IviumInputFile,
+        MaccorInputFile,
+        MaccorExcelInputFile,
+        MaccorRawInputFile,
+        DelimitedInputFile  # Should be last because it processes files line by line and accepts anything table-like
+    ]
 
-
-def serialize_datetime(v):
-    """
-    Recursively search for date[time] classes and convert
-    dates to iso format strings and datetimes to timestamps
-    """
-    if isinstance(v, datetime.datetime):
-        return v.timestamp()
-    if isinstance(v, datetime.date):
-        return v.isoformat()
-    if isinstance(v, dict):
-        return {k: serialize_datetime(x) for k, x in v.items()}
-    if isinstance(v, list):
-        return [serialize_datetime(x) for x in v]
-    return v
-
-def get_test_date(metadata):
-    """
-    Get the test date from the metadata
-    """
-    return serialize_datetime(metadata.get('Date of Test'))
-
-def get_import_file_handler(file_path: str):
-    """
-        Get the handler for the given file by iterating through parsers until one hits
-    """
-    for input_file_cls in registered_input_files:
-        try:
-            logger.debug('Tried input reader {}'.format(input_file_cls))
-            input_file = input_file_cls(
-                file_path=file_path,
-                standard_units=get_standard_units(),
-                standard_columns=get_standard_columns()
-            )
-        except Exception as e:
-            logger.debug('...failed with: ', type(e), e)
-        else:
+    def __init__(self, file_path: str, monitored_path: dict):
+        self.file_path = file_path
+        self.monitored_path = monitored_path
+        for input_file_cls in self.registered_input_files:
+            try:
+                logger.debug('Tried input reader {}'.format(input_file_cls))
+                input_file = input_file_cls(
+                    file_path=file_path,
+                    standard_units=get_standard_units(),
+                    standard_columns=get_standard_columns()
+                )
+            except Exception as e:
+                logger.debug('...failed with: ', type(e), e)
+                continue
             logger.debug('...succeeded...')
-            return input_file
-    raise UnsupportedFileTypeError
+            self.input_file = input_file
+            self.parser = input_file_cls
+            return
+        raise UnsupportedFileTypeError
 
+    @staticmethod
+    def serialize_datetime(v):
+        """
+        Recursively search for date[time] classes and convert
+        dates to iso format strings and datetimes to timestamps
+        """
+        if isinstance(v, datetime.datetime):
+            return v.timestamp()
+        if isinstance(v, datetime.date):
+            return v.isoformat()
+        if isinstance(v, dict):
+            return {k: HarvestProcessor.serialize_datetime(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [HarvestProcessor.serialize_datetime(x) for x in v]
+        return v
 
-def import_file(path: str, monitored_path: dict) -> bool:
-    """
-        Attempts to import a given file
-    """
-    monitored_path_uuid = monitored_path.get('uuid')
-    default_column_ids = get_standard_columns()
-    default_units = get_standard_units()
-    max_upload_size = get_setting('max_upload_bytes')
-    if not os.path.isfile(path):
-        logger.warn(f"{path} is not a file, skipping")
-        report_harvest_result(path=path, error=FileNotFoundError())
-        return False
-    logger.info("Importing " + path)
+    @staticmethod
+    def get_test_date(metadata):
+        """
+        Get the test date from the metadata
+        """
+        return HarvestProcessor.serialize_datetime(metadata.get('Date of Test'))
 
-    try:
-        # Attempt reading the file before updating the database to avoid
-        # creating rows for a file we can't read.
-        # TODO handle rows in the dataset and access tables with no
-        # corresponding data since the import might fail while reading the data
-        # anyway
-        input_file = get_import_file_handler(file_path=path)
+    def harvest(self):
+        """
+        Report the file metadata, column metadata, and upload the data to the server
+        """
+        metadata_time = time.time()
+        self._report_file_metadata()
+        column_time = time.time()
+        logger.info(f"Metadata reported in {column_time - metadata_time:.2f} seconds")
+        self._report_column_metadata()
+        data_prep_time = time.time()
+        logger.info(f"Column metadata reported in {data_prep_time - column_time:.2f} seconds")
+        self._prepare_data()
+        upload_time = time.time()
+        logger.info(f"Data prepared in {upload_time - data_prep_time:.2f} seconds")
+        self._upload_data()
+        logger.info(f"Data uploaded in {time.time() - upload_time:.2f} seconds")
+        self._delete_temp_files()
 
-        # Send metadata
-        core_metadata, extra_metadata = input_file.load_metadata()
+    def _report_file_metadata(self):
+        """
+        Report a file's metadata, and save the server response to self.server_metadata
+        """
+        core_metadata, extra_metadata = self.input_file.load_metadata()
         report = report_harvest_result(
-            path=path,
-            monitored_path_uuid=monitored_path_uuid,
+            path=self.file_path,
+            monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
                 'task': 'import',
-                'status': 'begin',
-                'core_metadata': serialize_datetime(core_metadata),
-                'extra_metadata': serialize_datetime(extra_metadata),
-                'test_date': get_test_date(core_metadata),
-                'parser': input_file.__class__.__name__
+                'stage': 'file metadata',
+                'core_metadata': HarvestProcessor.serialize_datetime(core_metadata),
+                'extra_metadata': HarvestProcessor.serialize_datetime(extra_metadata),
+                'test_date': HarvestProcessor.get_test_date(core_metadata),
+                'parser': self.input_file.__class__.__name__
             }
         )
         if report is None:
-            logger.error(f"API Error")
+            logger.error(f"Report Metadata - API Error: no response from server")
             return False
         if not report.ok:
             try:
-                logger.error(f"API responded with Error: {report.json()['error']}")
+                logger.error(f"Report Metadata - API responded with Error: {report.json()['error']}")
             except BaseException:
-                logger.error(f"API Error: {report.status_code}")
+                logger.error(f"Report Metadata - API Error: {report.status_code}")
             return False
-        upload_info = report.json()['upload_info']
-        last_uploaded_record = upload_info.get('last_record_number')
-        columns = upload_info.get('columns')
+        self.server_metadata = report.json()['upload_info']
 
-        # Figure out column data
+    def _report_column_metadata(self):
+        """
+        Report the column metadata to the server.
+        Data include the column names, types, units, and whether they relate to recognised standard columns.
+        """
+        default_units = get_standard_units()
+        columns = self.server_metadata.get('columns')
         if len(columns):
             mapping = {c.get('name'): c.get('id') for c in columns}
         else:
-            mapping = input_file.get_file_column_to_standard_column_mapping()
-        # limit size of requests. 1kb/column is an arbitrary buffer size.
-        size = 0
-        max_size = max_upload_size
-        nth_part = 0
-        start_row = last_uploaded_record if last_uploaded_record is not None else 0
-        # Find out if there's a Sample number column, otherwise we use the row number
-        record_number_column = [k for k, v in mapping.items() if v == default_column_ids['Sample Number']]
-        if len(record_number_column):
-            record_number_column = record_number_column[0]
-            column_data = {}
-        else:
-            record_number_column = None
-            column_data = {"Sample Number": {
-                "column_id": default_column_ids["Sample Number"],
-                "values": []
-            }}
+            mapping = self.input_file.get_file_column_to_standard_column_mapping()
 
-        # TODO: is this actually determined correctly? Seems there are actually lots of data columns we miss??
-        # Anyway, leaving this as instructed because everyone's happy with it as is.
-        columns_with_data = [c for c in input_file.column_info.keys() if input_file.column_info[c].get('has_data')]
-        generator = input_file.load_data(input_file.file_path, columns_with_data)
-        start = time.process_time()
-        new_row = {}
-        for i, r in enumerate(generator):
-            if start_row > 0 and int(r.get(record_number_column, i)) <= start_row:
-                continue
-            # Data are stored up in rows and shipped out when
-            # adding the current row would exceed the server data
-            # size limit.
-            # If sent, sent data are wiped from column_data.
-            # New row data are added to column_data below.
-            size += sys.getsizeof(json.dumps(new_row, cls=NpEncoder))
-            if size > max_size:
-                if start_row == i:
-                    logger.error(f"Row too large to upload {len(r.keys())} columns, size={sys.getsizeof(r)}")
-                    return False
-                logger.info(f"Upload part {nth_part} (rows {start_row}-{i - 1}; {size}bytes)")
-                logger.info(f"Read took {time.process_time() - start}")
-                nth_part += 1
-                start_row = i
-                report = report_harvest_result(
-                    path=path,
-                    monitored_path_uuid=monitored_path_uuid,
-                    content={
-                    'task': 'import',
-                    'status': 'in_progress',
-                    'data': [v for v in column_data.values()],
-                    'test_date': get_test_date(core_metadata)
-                })
-                if report is None:
-                    logger.error(f"API Error")
-                    return False
-                if not report.ok:
-                    try:
-                        logger.error(f"API responded with Error: {report.json()['error']}")
-                    except BaseException:
-                        logger.error(f"API Error: {report.status_code}")
-                    return False
-                for k in column_data.keys():
-                    column_data[k]['values'] = []
-                start = time.process_time()
-                size = 0
+        # Use first row to determine column data types
+        columns_with_data = [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
+        first_row = next(self.input_file.load_data(self.input_file.file_path, columns_with_data))
+        column_data = {}
 
-            if i > 0:
-                for k, v in new_row.items():
-                    column_data[k]['values'].append(v)
+        for k, v in first_row.items():
+            column_data[k] = {'data_type': type(v).__name__}
+            if k in mapping:
+                column_data[k]['column_id'] = mapping[k]
+            else:
+                column_data[k]['column_name'] = k
+                if 'unit' in self.input_file.column_info[k]:
+                    column_data[k]['unit_symbol'] = self.input_file.column_info[k].get('unit')
+                else:
+                    column_data[k]['unit_id'] = default_units['Unknown']
 
-            # Make sure we send record numbers to the server
-            new_row = {"Sample Number": i} if record_number_column is None else {}
-
-            for k, v in r.items():
-                if k not in column_data:
-                    column_data[k] = {}
-                    if k in mapping:
-                        column_data[k]['column_id'] = mapping[k]
-                    else:
-                        column_data[k]['column_name'] = k
-                        if 'unit' in input_file.column_info[k]:
-                            column_data[k]['unit_symbol'] = input_file.column_info[k].get('unit')
-                        else:
-                            column_data[k]['unit_id'] = default_units['Unitless']
-                    column_data[k]['values'] = []
-                    if k == record_number_column:
-                        sample_counters = [k for k, v in column_data.items() if v.get('id') == default_column_ids.get('Sample Number')]
-                        if len(sample_counters) > 0:
-                            logger.error(f"Cannot set more than one official_sample_counter column ({[*sample_counters, k]})")
-                            return False
-                        column_data[k]['id'] = default_column_ids.get('Sample Number')
-                new_row[k] = v
-
-            if i == 1:
-                # Determine data types from first row via json serialization
-                types_row = json.loads(json.dumps(new_row, cls=NpEncoder))
-                for k in column_data.keys():
-                    column_data[k]['data_type'] = type(types_row[k]).__name__
-
-        # Send data
+        # Upload results
         report = report_harvest_result(
-            path=path,
-            monitored_path_uuid=monitored_path_uuid,
+            path=self.file_path,
+            monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
-            'task': 'import',
-            'status': 'in_progress',
-            'data': [v for v in column_data.values()],
-            'labels': tuple(input_file.get_data_labels()),
-            'test_date': get_test_date(core_metadata)
-        })
+                'task': 'import',
+                'stage': 'column metadata',
+                'metadata': json.dumps(column_data)
+            }
+        )
         if report is None:
-            logger.error(f"API Error")
+            logger.error(f"Report Column Metadata - API Error: no response from server")
             return False
         if not report.ok:
             try:
-                logger.error(f"API responded with Error: {report.json()['error']}")
+                logger.error(f"Report Column Metadata - API responded with Error: {report.json()['error']}")
             except BaseException:
-                logger.error(f"API Error: {report.status_code}")
+                logger.error(f"Report Column Metadata - API Error: {report.status_code}")
+            return False
+        return True
+
+    def _prepare_data(self, partition_line_count=100_000_000):
+            """
+            Read the data from the file and save it as a temporary .parquet file self.data_file
+            """
+            def partition_generator(generator, partition_line_count=100_000_000):
+                def to_df(rows):
+                    return pandas.DataFrame(rows)
+
+                stopping = False
+                while not stopping:
+                    rows = []
+                    try:
+                        for _ in range(partition_line_count):
+                            rows.append(next(generator))
+                    except StopIteration:
+                        stopping = True
+                    yield to_df(rows)
+
+            reader = self.input_file.load_data(
+                self.file_path,
+                [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
+            )
+
+            data = dask.dataframe.from_map(
+                pandas.DataFrame,
+                partition_generator(reader, partition_line_count=partition_line_count)
+            )
+
+            # Save the data as parquet
+            self.data_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet")
+            data.to_parquet(
+                self.data_file_name,
+                write_index=False,
+                compute=True,
+                custom_metadata={
+                    'galv-harvester-version': VERSION
+                }
+            )
+            self.data_row_count = data.shape[0].compute()
+            self.data_partition_count = data.npartitions
+
+    def _upload_data(self):
+        """
+        Upload the data to the server
+        """
+        upload_params = report_harvest_result(
+            path=self.file_path,
+            monitored_path_uuid=self.monitored_path.get('uuid'),
+            content={
+                'task': 'import',
+                'stage': 'get upload urls',
+                'content': {
+                    'data_row_count': self.data_row_count,
+                    'data_partition_count': self.data_partition_count
+                }
+            }
+        )
+        # The server should respond with a list of presigned URLs for each partition in the format {url, fields}
+        if upload_params is None:
+            logger.error(f"Get Upload Params - API Error: no response from server")
+            return False
+        if not upload_params.ok:
+            try:
+                logger.error(f"Get Upload Params - API responded with Error: {upload_params.json()['error']}")
+            except BaseException:
+                logger.error(f"Get Upload Params - API Error: {upload_params.status_code}")
             return False
 
-        logger.info("File successfully imported")
-    except Exception as e:
-        logger.error(f"{e.__class__.__name__}: {e}")
+        self.upload_params = upload_params.json()
+
+        successes = 0
+        errors = []
+        for i in range(self.data_partition_count):
+            files = {'file': open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb')}
+            url = self.upload_params['upload_urls'][i]['url']
+            fields = self.upload_params['upload_urls'][i]['fields']
+            response = requests.post(url, data=fields, files=files)
+            if response.status_code != 204:
+                try:
+                    errors.append((i, response.json()['error']))
+                except BaseException:
+                    errors.append((i, response.status_code))
+            else:
+                successes += 1
+
+        if successes != self.data_partition_count:
+            logger.error(f"Data Upload - {successes} of {self.data_partition_count} partitions uploaded successfully")
+            for i, error in errors:
+                logger.error(f"Data Upload - Partition {i} failed with error: {error}")
+        else:
+            logger.info(f"Data Upload - {successes} partitions uploaded successfully")
+
         report_harvest_result(
-            path=path,
-            monitored_path_uuid=monitored_path_uuid,
-            error=e
+            path=self.file_path,
+            monitored_path_uuid=self.monitored_path.get('uuid'),
+            content={
+                'task': 'import',
+                'stage': 'upload complete',
+                'content': {
+                    'successes': successes,
+                    'errors': errors
+                }
+            }
         )
-        return False
-    return True
+
+    def _delete_temp_files(self):
+        """
+        Delete temporary files created during the process
+        """
+        if hasattr(self, 'data_file_name') and os.path.exists(self.data_file_name):
+            shutil.rmtree(self.data_file_name)
+
+    def __del__(self):
+        self._delete_temp_files()
+
+
+if False:
+    # My debugger won't connect, so running this in the console can figure out dask issues
+    import os
+    import pandas
+    import dask.dataframe
+    import shutil
+    from harvester.settings import get_standard_units, get_standard_columns
+    from harvester.parse.biologic_input_file import BiologicMprInputFile
+    os.system('cp .harvester/.harvester.json /harvester_files')
+    standard_units = get_standard_units()
+    standard_columns = get_standard_columns()
+    file_path = '.test-data/test-suite-small/adam_3_C05.mpr'
+    input_file = BiologicMprInputFile(file_path, standard_units=standard_units, standard_columns=standard_columns)
+    def partition_generator(generator, partition_line_count = 100_000_000):
+        def to_df(rows):
+            return pandas.DataFrame(rows)
+        stopping = False
+        while not stopping:
+            rows = []
+            try:
+                for _ in range(partition_line_count):
+                    rows.append(next(generator))
+            except StopIteration:
+                stopping = True
+            yield to_df(rows)
+
+    generator = input_file.load_data(
+        file_path,
+        [c for c in input_file.column_info.keys() if input_file.column_info[c].get('has_data')]
+    )
+
+    data = dask.dataframe.from_map(pandas.DataFrame, partition_generator(generator, partition_line_count=100000))
+    data.compute()
+    print(f"Partitions: {data.npartitions}")
+    data.to_parquet(
+        "test.tmp.parquet",
+        write_index=False,
+        compute=True,
+        custom_metadata={
+            'galv-harvester-version': '0.1.0'
+        }
+    )
+    print(f"Rows: {data.shape[0].compute()}")
+    # Then we would upload the data by getting presigned URLs for each partition
+    shutil.rmtree("test.tmp.parquet")
+    print('done')
