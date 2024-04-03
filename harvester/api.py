@@ -4,6 +4,8 @@
 
 import os
 import json
+
+from . import settings
 from .utils import NpEncoder
 import requests
 from .settings import get_setting, get_settings, get_settings_file, get_logger, update_envvars
@@ -21,9 +23,9 @@ def report_harvest_result(
     start = time.time()
     try:
         if error is not None:
-            data = {'status': 'error', 'error': f"{error.__class__.__name__}: {error}"}
+            data = {'status': settings.HARVESTER_STATUS_ERROR, 'error': f"{error.__class__.__name__}: {error}"}
         else:
-            data = {'status': 'success', 'content': content}
+            data = {'status': settings.HARVESTER_STATUS_SUCCESS, 'content': content}
         data['path'] = path
         data['monitored_path_uuid'] = monitored_path_uuid
         logger.debug(f"{get_setting('url')}report/; {json.dumps(data, cls=NpEncoder)}")

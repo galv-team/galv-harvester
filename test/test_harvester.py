@@ -9,6 +9,8 @@ from pathlib import Path
 
 import harvester.run
 import harvester.harvest
+from harvester import settings
+
 
 def get_test_file_path():
     return os.getenv('TEST_DIR', "/usr/test_data")
@@ -214,7 +216,8 @@ class TestHarvester(unittest.TestCase):
                 ok = False
                 for c in mock_report.call_args_list:
                     if c.kwargs['content']['task'] == task:
-                        if not task == 'import' or c.kwargs['content']['stage'] == 'harvest complete':
+                        if (not task == settings.HARVESTER_TASK_IMPORT or
+                                c.kwargs['content']['stage'] == settings.HARVEST_STAGE_COMPLETE):
                             ok = True
                             break
                 if not ok:
@@ -259,30 +262,34 @@ class TestHarvester(unittest.TestCase):
                         raise AssertionError(f"Received multiple upload calls")
                     raise AssertionError(f"Report made with no content")
 
-            if c.kwargs['content']['task'] == 'import':
+            if c.kwargs['content']['task'] == settings.HARVESTER_TASK_IMPORT:
                 stage = stages.pop(0)
                 s = c.kwargs['content']['stage']
                 if s != stage:
                     raise AssertionError(f"Expected import report to have stage {stage}, received {s}")
 
-                if s == 'file_metadata':
-                    for k in ['core_metadata', 'extra_metadata', 'test_date', 'parser']:
-                        if k not in c.kwargs['content']:
-                            raise AssertionError(f"Expected file_metadata report to contain {k}")
-                elif s == 'column_metadata':
-                    if not c.kwargs['content']['metadata']:
-                        raise AssertionError(f"Expected column_metadata report to contain metadata")
-                elif s == 'get_upload_params':
-                    if not c.kwargs['content']['data_row_count']:
-                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
-                    if not c.kwargs['content']['data_partition_count']:
-                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
-                elif s == 'upload_complete':
-                    if not c.kwargs['content']['successes']:
-                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
-                    if not c.kwargs['content']['errors']:
-                        raise AssertionError(f"Expected get_upload_params report to contain upload_info")
-
+                data = c.kwargs['content'].get('data')
+                try:
+                    if s == settings.HARVEST_STAGE_FILE_METADATA:
+                        for k in ['core_metadata', 'extra_metadata', 'test_date', 'parser']:
+                            if k not in data:
+                                raise AssertionError(f"Expected file_metadata report to contain {k}")
+                    elif s == settings.HARVEST_STAGE_COLUMN_METADATA:
+                        if not isinstance(data, dict):
+                            raise AssertionError(f"Expected column_metadata report to contain a dict of columns")
+                    elif s == settings.HARVEST_STAGE_GET_UPLOAD_URLS:
+                        if 'row_count' not in data:
+                            raise AssertionError(f"Expected get_upload_params report to contain row count")
+                        if 'partition_count' not in data:
+                            raise AssertionError(f"Expected get_upload_params report to contain partition count")
+                    elif s == settings.HARVEST_STAGE_UPLOAD_COMPLETE:
+                        if 'successes' not in data:
+                            raise AssertionError(f"Expected upload completion report to contain success count")
+                        if 'errors' not in data:
+                            raise AssertionError(f"Expected upload completion report to contain errors list")
+                except AssertionError as e:
+                    print(data)
+                    raise e
 
     def test_import_mpr(self):
         self.import_file('adam_3_C05.mpr')
@@ -299,8 +306,9 @@ class TestHarvester(unittest.TestCase):
 
         def validate_preamble(calls):
             for c in calls:
-                if c.kwargs['content']['task'] == 'import' and c.kwargs['content']['stage'] == 'file metadata':
-                    if c.kwargs['content']['core_metadata'].get('preamble') is None:
+                if (c.kwargs['content']['task'] == settings.HARVESTER_TASK_IMPORT and
+                        c.kwargs['content']['stage'] == settings.HARVEST_STAGE_FILE_METADATA):
+                    if c.kwargs['content'].get('data', {}).get('core_metadata', {}).get('preamble') is None:
                         raise AssertionError(f"Expected import report to contain 'preamble'")
                     else:
                         return

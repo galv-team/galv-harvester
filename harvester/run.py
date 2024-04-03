@@ -6,6 +6,7 @@ import os.path
 import re
 import time
 
+from harvester import settings
 from .parse.exceptions import UnsupportedFileTypeError
 from .settings import get_logger, get_setting
 from .api import report_harvest_result, update_config
@@ -65,7 +66,7 @@ def harvest_path(monitored_path: dict):
                         path=full_path,
                         monitored_path_uuid=monitored_path.get('uuid'),
                         content={
-                            'task': 'file_size',
+                            'task': settings.HARVESTER_TASK_FILE_SIZE,
                             'size': os.stat(full_path).st_size
                         }
                     )
@@ -80,7 +81,10 @@ def harvest_path(monitored_path: dict):
                                 report_harvest_result(
                                     path=full_path,
                                     monitored_path_uuid=monitored_path.get('uuid'),
-                                    content={'task': 'import', 'stage': 'harvest complete'}
+                                    content={
+                                        'task': settings.HARVESTER_TASK_IMPORT,
+                                        'stage': settings.HARVEST_STAGE_COMPLETE
+                                    }
                                 )
                                 logger.info(f"Successfully parsed file {file_path}")
                             except BaseException as e:
@@ -88,7 +92,10 @@ def harvest_path(monitored_path: dict):
                                 report_harvest_result(
                                     path=full_path,
                                     monitored_path_uuid=monitored_path.get('uuid'),
-                                    content={'task': 'import', 'stage': 'harvest failed'}
+                                    content={
+                                        'task': settings.HARVESTER_TASK_IMPORT,
+                                        'stage': settings.HARVEST_STAGE_FAILED
+                                    }
                                 )
                 except BaseException as e:
                     logger.error(f"{e.__class__.__name__}: {e}")

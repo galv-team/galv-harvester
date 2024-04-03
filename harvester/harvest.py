@@ -12,6 +12,7 @@ import json
 import dask.dataframe
 import requests
 
+from . import settings
 from .parse.exceptions import UnsupportedFileTypeError
 from .parse.ivium_input_file import IviumInputFile
 from .parse.biologic_input_file import BiologicMprInputFile
@@ -108,12 +109,14 @@ class HarvestProcessor:
             path=self.file_path,
             monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
-                'task': 'import',
-                'stage': 'file metadata',
-                'core_metadata': HarvestProcessor.serialize_datetime(core_metadata),
-                'extra_metadata': HarvestProcessor.serialize_datetime(extra_metadata),
-                'test_date': HarvestProcessor.get_test_date(core_metadata),
-                'parser': self.input_file.__class__.__name__
+                'task': settings.HARVESTER_TASK_IMPORT,
+                'stage': settings.HARVEST_STAGE_FILE_METADATA,
+                'data': {
+                    'core_metadata': HarvestProcessor.serialize_datetime(core_metadata),
+                    'extra_metadata': HarvestProcessor.serialize_datetime(extra_metadata),
+                    'test_date': HarvestProcessor.get_test_date(core_metadata),
+                    'parser': self.input_file.__class__.__name__
+                }
             }
         )
         if report is None:
@@ -160,9 +163,9 @@ class HarvestProcessor:
             path=self.file_path,
             monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
-                'task': 'import',
-                'stage': 'column metadata',
-                'metadata': json.dumps(column_data)
+                'task': settings.HARVESTER_TASK_IMPORT,
+                'stage': settings.HARVEST_STAGE_COLUMN_METADATA,
+                'data': column_data
             }
         )
         if report is None:
@@ -177,45 +180,45 @@ class HarvestProcessor:
         return True
 
     def _prepare_data(self, partition_line_count=100_000_000):
-            """
-            Read the data from the file and save it as a temporary .parquet file self.data_file
-            """
-            def partition_generator(generator, partition_line_count=100_000_000):
-                def to_df(rows):
-                    return pandas.DataFrame(rows)
+        """
+        Read the data from the file and save it as a temporary .parquet file self.data_file
+        """
+        def partition_generator(generator, partition_line_count=100_000_000):
+            def to_df(rows):
+                return pandas.DataFrame(rows)
 
-                stopping = False
-                while not stopping:
-                    rows = []
-                    try:
-                        for _ in range(partition_line_count):
-                            rows.append(next(generator))
-                    except StopIteration:
-                        stopping = True
-                    yield to_df(rows)
+            stopping = False
+            while not stopping:
+                rows = []
+                try:
+                    for _ in range(partition_line_count):
+                        rows.append(next(generator))
+                except StopIteration:
+                    stopping = True
+                yield to_df(rows)
 
-            reader = self.input_file.load_data(
-                self.file_path,
-                [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
-            )
+        reader = self.input_file.load_data(
+            self.file_path,
+            [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
+        )
 
-            data = dask.dataframe.from_map(
-                pandas.DataFrame,
-                partition_generator(reader, partition_line_count=partition_line_count)
-            )
+        data = dask.dataframe.from_map(
+            pandas.DataFrame,
+            partition_generator(reader, partition_line_count=partition_line_count)
+        )
 
-            # Save the data as parquet
-            self.data_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet")
-            data.to_parquet(
-                self.data_file_name,
-                write_index=False,
-                compute=True,
-                custom_metadata={
-                    'galv-harvester-version': VERSION
-                }
-            )
-            self.data_row_count = data.shape[0].compute()
-            self.data_partition_count = data.npartitions
+        # Save the data as parquet
+        self.data_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet")
+        data.to_parquet(
+            self.data_file_name,
+            write_index=False,
+            compute=True,
+            custom_metadata={
+                'galv-harvester-version': VERSION
+            }
+        )
+        self.row_count = data.shape[0].compute()
+        self.partition_count = data.npartitions
 
     def _upload_data(self):
         """
@@ -225,11 +228,11 @@ class HarvestProcessor:
             path=self.file_path,
             monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
-                'task': 'import',
-                'stage': 'get upload urls',
-                'content': {
-                    'data_row_count': self.data_row_count,
-                    'data_partition_count': self.data_partition_count
+                'task': settings.HARVESTER_TASK_IMPORT,
+                'stage': settings.HARVEST_STAGE_GET_UPLOAD_URLS,
+                'data': {
+                    'row_count': self.row_count,
+                    'partition_count': self.partition_count
                 }
             }
         )
@@ -248,7 +251,7 @@ class HarvestProcessor:
 
         successes = 0
         errors = []
-        for i in range(self.data_partition_count):
+        for i in range(self.partition_count):
             files = {'file': open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb')}
             url = self.upload_params['upload_urls'][i]['url']
             fields = self.upload_params['upload_urls'][i]['fields']
@@ -261,8 +264,8 @@ class HarvestProcessor:
             else:
                 successes += 1
 
-        if successes != self.data_partition_count:
-            logger.error(f"Data Upload - {successes} of {self.data_partition_count} partitions uploaded successfully")
+        if successes != self.partition_count:
+            logger.error(f"Data Upload - {successes} of {self.partition_count} partitions uploaded successfully")
             for i, error in errors:
                 logger.error(f"Data Upload - Partition {i} failed with error: {error}")
         else:
@@ -272,9 +275,9 @@ class HarvestProcessor:
             path=self.file_path,
             monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
-                'task': 'import',
-                'stage': 'upload complete',
-                'content': {
+                'task': settings.HARVESTER_TASK_IMPORT,
+                'stage': settings.HARVEST_STAGE_UPLOAD_COMPLETE,
+                'data': {
                     'successes': successes,
                     'errors': errors
                 }

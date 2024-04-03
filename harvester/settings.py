@@ -88,3 +88,15 @@ def update_envvars():
         if old is not None:
             logger.info(f"Unsetting envvar {k} (previous value: {old})")
         os.unsetenv(k)
+
+# These definitions should be kept in sync with the definitions in the backend
+HARVESTER_TASK_FILE_SIZE = 'file_size'
+HARVESTER_TASK_IMPORT = 'import'
+HARVESTER_STATUS_SUCCESS = 'success'
+HARVESTER_STATUS_ERROR = 'error'
+HARVEST_STAGE_FILE_METADATA = 'file metadata'
+HARVEST_STAGE_COLUMN_METADATA = 'column metadata'
+HARVEST_STAGE_GET_UPLOAD_URLS = 'get upload urls'
+HARVEST_STAGE_UPLOAD_COMPLETE = 'upload complete'
+HARVEST_STAGE_COMPLETE = 'harvest complete'
+HARVEST_STAGE_FAILED = 'harvest failed'
