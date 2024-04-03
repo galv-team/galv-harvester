@@ -235,7 +235,7 @@ class TestHarvester(unittest.TestCase):
             # An amalgam of the expected report content for different calls
             {
                 'upload_info': {'last_record_number': 0, 'columns': []},
-                'upload_urls': [
+                'storage_urls': [
                     {'url': 'http://localhost', 'fields': []},
                     {'url': 'http://localhost', 'fields': []},
                     {'url': 'http://localhost', 'fields': []}

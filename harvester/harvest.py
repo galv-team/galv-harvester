@@ -253,8 +253,8 @@ class HarvestProcessor:
         errors = []
         for i in range(self.partition_count):
             files = {'file': open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb')}
-            url = self.upload_params['upload_urls'][i]['url']
-            fields = self.upload_params['upload_urls'][i]['fields']
+            url = self.upload_params['storage_urls'][i]['url']
+            fields = self.upload_params['storage_urls'][i]['fields']
             response = requests.post(url, data=fields, files=files)
             if response.status_code != 204:
                 try:
