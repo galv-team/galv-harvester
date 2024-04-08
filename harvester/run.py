@@ -5,6 +5,7 @@
 import os.path
 import re
 import time
+import traceback
 
 from harvester import settings
 from .parse.exceptions import UnsupportedFileTypeError
@@ -88,13 +89,16 @@ def harvest_path(monitored_path: dict):
                                 )
                                 logger.info(f"Successfully parsed file {file_path}")
                             except BaseException as e:
-                                logger.warn(f"FAILED parsing file {file_path}")
+                                logger.warning(f"FAILED parsing file {file_path}: {e.__class__.__name__}: {e}")
+                                if e.__traceback__ is not None:
+                                    logger.warning(traceback.format_exc())
                                 report_harvest_result(
                                     path=full_path,
                                     monitored_path_uuid=monitored_path.get('uuid'),
                                     content={
                                         'task': settings.HARVESTER_TASK_IMPORT,
-                                        'stage': settings.HARVEST_STAGE_FAILED
+                                        'stage': settings.HARVEST_STAGE_FAILED,
+                                        'error': f"Error in Harvester. {e.__class__.__name__}: {e}. [See harvester logs for more details]"
                                     }
                                 )
                 except BaseException as e:

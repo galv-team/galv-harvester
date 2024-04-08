@@ -121,13 +121,13 @@ class HarvestProcessor:
         )
         if report is None:
             logger.error(f"Report Metadata - API Error: no response from server")
-            return False
+            raise RuntimeError("API Error: no response from server")
         if not report.ok:
             try:
                 logger.error(f"Report Metadata - API responded with Error: {report.json()['error']}")
             except BaseException:
                 logger.error(f"Report Metadata - API Error: {report.status_code}")
-            return False
+            raise RuntimeError("API Error: server responded with error")
         self.server_metadata = report.json()['upload_info']
 
     def _report_column_metadata(self):
@@ -170,14 +170,13 @@ class HarvestProcessor:
         )
         if report is None:
             logger.error(f"Report Column Metadata - API Error: no response from server")
-            return False
+            raise RuntimeError("API Error: no response from server")
         if not report.ok:
             try:
                 logger.error(f"Report Column Metadata - API responded with Error: {report.json()['error']}")
             except BaseException:
                 logger.error(f"Report Column Metadata - API Error: {report.status_code}")
-            return False
-        return True
+            raise RuntimeError("API Error: server responded with error")
 
     def _prepare_data(self, partition_line_count=100_000_000):
         """
@@ -239,13 +238,13 @@ class HarvestProcessor:
         # The server should respond with a list of presigned URLs for each partition in the format {url, fields}
         if upload_params is None:
             logger.error(f"Get Upload Params - API Error: no response from server")
-            return False
+            raise RuntimeError("API Error: no response from server")
         if not upload_params.ok:
             try:
                 logger.error(f"Get Upload Params - API responded with Error: {upload_params.json()['error']}")
             except BaseException:
                 logger.error(f"Get Upload Params - API Error: {upload_params.status_code}")
-            return False
+            raise RuntimeError("API Error: server responded with error")
 
         self.upload_params = upload_params.json()
 
@@ -258,9 +257,9 @@ class HarvestProcessor:
             response = requests.post(url, data=fields, files=files)
             if response.status_code != 204:
                 try:
-                    errors.append((i, response.json()['error']))
+                    errors.append((i, f"POST to {url} failed: {response.json()['error']}"))
                 except BaseException:
-                    errors.append((i, response.status_code))
+                    errors.append((i, f"POST to {url} failed: {response.status_code}"))
             else:
                 successes += 1
 
