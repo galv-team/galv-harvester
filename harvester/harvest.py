@@ -155,8 +155,6 @@ class HarvestProcessor:
                 column_data[k]['column_name'] = k
                 if 'unit' in self.input_file.column_info[k]:
                     column_data[k]['unit_symbol'] = self.input_file.column_info[k].get('unit')
-                else:
-                    column_data[k]['unit_id'] = default_units['Unknown']
 
         # Upload results
         report = report_harvest_result(
@@ -252,6 +250,9 @@ class HarvestProcessor:
         errors = []
         for i in range(self.partition_count):
             files = {'file': open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb')}
+            if self.upload_params['storage_urls'][i].get('error'):
+                errors.append((i, f"Skipped file {i}: {self.upload_params['storage_urls'][i]['error']}"))
+                continue
             url = self.upload_params['storage_urls'][i]['url']
             fields = self.upload_params['storage_urls'][i]['fields']
             response = requests.post(url, data=fields, files=files)
