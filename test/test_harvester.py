@@ -251,12 +251,22 @@ class TestHarvester(unittest.TestCase):
             additional_checks(mock_report.call_args_list)
 
     def validate_report_calls(self, calls):
-        stages = ['file metadata', 'column metadata', 'get upload urls', 'upload complete']
+        stages = ['file metadata', 'column metadata', 'upload parquet partitions', 'upload complete']
         upload_fired = False
         for c in calls:
             if not 'content' in c.kwargs:
                 if 'files' in c.kwargs and not upload_fired:
                     upload_fired = True
+                    data = c.kwargs.get('data')
+                    if 'partition_number' not in data:
+                        raise AssertionError(f"Expected upload parquet partitions report to contain row count")
+                    if 'partition_count' not in data:
+                        raise AssertionError(f"Expected upload parquet partitions report to contain partition count")
+                    if 'total_row_count' not in data:
+                        raise AssertionError(f"Expected upload parquet partitions report to contain total row count")
+                    if 'filename' not in data:
+                        raise AssertionError(f"Expected upload parquet partitions report to contain filename")
+                    return
                 else:
                     if upload_fired:
                         raise AssertionError(f"Received multiple upload calls")
@@ -277,11 +287,6 @@ class TestHarvester(unittest.TestCase):
                     elif s == settings.HARVEST_STAGE_COLUMN_METADATA:
                         if not isinstance(data, dict):
                             raise AssertionError(f"Expected column_metadata report to contain a dict of columns")
-                    elif s == settings.HARVEST_STAGE_GET_UPLOAD_URLS:
-                        if 'row_count' not in data:
-                            raise AssertionError(f"Expected get_upload_params report to contain row count")
-                        if 'partition_count' not in data:
-                            raise AssertionError(f"Expected get_upload_params report to contain partition count")
                     elif s == settings.HARVEST_STAGE_UPLOAD_COMPLETE:
                         if 'successes' not in data:
                             raise AssertionError(f"Expected upload completion report to contain success count")

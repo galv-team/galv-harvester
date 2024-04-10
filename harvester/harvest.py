@@ -4,6 +4,8 @@
 
 import datetime
 import shutil
+
+import math
 import pandas
 import os
 import tempfile
@@ -23,7 +25,7 @@ from .parse.maccor_input_file import (
 )
 from .parse.delimited_input_file import DelimitedInputFile
 
-from .settings import get_logger, get_standard_units, get_standard_columns, VERSION
+from .settings import get_logger, get_standard_units, get_standard_columns, VERSION, get_setting
 from .api import report_harvest_result
 
 logger = get_logger(__file__)
@@ -135,7 +137,6 @@ class HarvestProcessor:
         Report the column metadata to the server.
         Data include the column names, types, units, and whether they relate to recognised standard columns.
         """
-        default_units = get_standard_units()
         columns = self.server_metadata.get('columns')
         if len(columns):
             mapping = {c.get('name'): c.get('id') for c in columns}
@@ -150,7 +151,7 @@ class HarvestProcessor:
         for k, v in first_row.items():
             column_data[k] = {'data_type': type(v).__name__}
             if k in mapping:
-                column_data[k]['column_id'] = mapping[k]
+                column_data[k]['column_type_id'] = mapping[k]
             else:
                 column_data[k]['column_name'] = k
                 if 'unit' in self.input_file.column_info[k]:
@@ -176,11 +177,11 @@ class HarvestProcessor:
                 logger.error(f"Report Column Metadata - API Error: {report.status_code}")
             raise RuntimeError("API Error: server responded with error")
 
-    def _prepare_data(self, partition_line_count=100_000_000):
+    def _prepare_data(self):
         """
         Read the data from the file and save it as a temporary .parquet file self.data_file
         """
-        def partition_generator(generator, partition_line_count=100_000_000):
+        def partition_generator(generator, partition_line_count=100_000):
             def to_df(rows):
                 return pandas.DataFrame(rows)
 
@@ -193,6 +194,8 @@ class HarvestProcessor:
                 except StopIteration:
                     stopping = True
                 yield to_df(rows)
+
+        partition_line_count = self.monitored_path.get("max_partition_line_count", 100_000)
 
         reader = self.input_file.load_data(
             self.file_path,
@@ -221,53 +224,50 @@ class HarvestProcessor:
         """
         Upload the data to the server
         """
-        upload_params = report_harvest_result(
-            path=self.file_path,
-            monitored_path_uuid=self.monitored_path.get('uuid'),
-            content={
-                'task': settings.HARVESTER_TASK_IMPORT,
-                'stage': settings.HARVEST_STAGE_GET_UPLOAD_URLS,
-                'data': {
-                    'row_count': self.row_count,
-                    'partition_count': self.partition_count
-                }
-            }
-        )
-        # The server should respond with a list of presigned URLs for each partition in the format {url, fields}
-        if upload_params is None:
-            logger.error(f"Get Upload Params - API Error: no response from server")
-            raise RuntimeError("API Error: no response from server")
-        if not upload_params.ok:
-            try:
-                logger.error(f"Get Upload Params - API responded with Error: {upload_params.json()['error']}")
-            except BaseException:
-                logger.error(f"Get Upload Params - API Error: {upload_params.status_code}")
-            raise RuntimeError("API Error: server responded with error")
 
-        self.upload_params = upload_params.json()
+        def pad0(n, width=math.floor(self.partition_count/10) + 1):
+            return f"{n:0{width}d}"
 
         successes = 0
-        errors = []
+        errors = {}
+
         for i in range(self.partition_count):
-            files = {'file': open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb')}
-            if self.upload_params['storage_urls'][i].get('error'):
-                errors.append((i, f"Skipped file {i}: {self.upload_params['storage_urls'][i]['error']}"))
-                continue
-            url = self.upload_params['storage_urls'][i]['url']
-            fields = self.upload_params['storage_urls'][i]['fields']
-            response = requests.post(url, data=fields, files=files)
-            if response.status_code != 204:
+            filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{pad0(i)}.parquet"
+            files = {'parquet_file': (filename, open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb'))}
+            report = report_harvest_result(
+                path=self.file_path,
+                monitored_path_uuid=self.monitored_path.get('uuid'),
+                # send data in a flat format to accompany file upload protocol.
+                # Kinda hacky because it overwrites much of report_harvest_result's functionality
+                data={
+                    'status': settings.HARVESTER_STATUS_SUCCESS,
+                    'path': self.file_path,
+                    'monitored_path_uuid': self.monitored_path.get('uuid'),
+                    'task': settings.HARVESTER_TASK_IMPORT,
+                    'stage': settings.HARVEST_STAGE_UPLOAD_PARQUET,
+                    'total_row_count': self.row_count,
+                    'partition_number': i,
+                    'partition_count': self.partition_count,
+                    'filename': filename
+                },
+                files=files
+            )
+            if report is None:
+                errors[i] = (f"Failed to upload {filename} - API Error: no response from server")
+            elif not report.ok:
                 try:
-                    errors.append((i, f"POST to {url} failed: {response.json()['error']}"))
+                    errors[i] = (f"Failed to upload {filename} - API responded with Error: {report.json()['error']}")
                 except BaseException:
-                    errors.append((i, f"POST to {url} failed: {response.status_code}"))
+                    errors[i] = f"Failed to upload {filename}. Received HTTP {report.status_code}"
             else:
                 successes += 1
 
+        if successes == 0 and self.partition_count > 0:
+            raise RuntimeError("API Error: failed to upload all partitions to server")
         if successes != self.partition_count:
             logger.error(f"Data Upload - {successes} of {self.partition_count} partitions uploaded successfully")
-            for i, error in errors:
-                logger.error(f"Data Upload - Partition {i} failed with error: {error}")
+            for filename, error in errors.items():
+                logger.error(f"Data Upload - Partition {filename} failed with error: {error}")
         else:
             logger.info(f"Data Upload - {successes} partitions uploaded successfully")
 

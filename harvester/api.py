@@ -18,7 +18,8 @@ def report_harvest_result(
         path: os.PathLike|str,
         monitored_path_uuid: str,
         content=None,
-        error: BaseException = None
+        error: BaseException = None,
+        **kwargs  # passed to requests.post
 ):
     start = time.time()
     try:
@@ -34,8 +35,9 @@ def report_harvest_result(
             headers={
                 'Authorization': f"Harvester {get_setting('api_key')}"
             },
-            # encode then decode to ensure np values are converted to standard types
-            json=json.loads(json.dumps(data, cls=NpEncoder))
+            # encode then decode to ensure np values are converted to standard types and null bytes are removed
+            json=json.loads(json.dumps(data, cls=NpEncoder).replace('\\u0000', '')),
+            **kwargs
         )
         try:
             out.json()
