@@ -59,6 +59,7 @@ def create_monitored_path(
         api_url, api_token, harvester_uuid, specified,
         team_id, monitor_path, monitor_path_regex
 ) -> None:
+    # TODO: Ensure that the team is a member of the harvester's lab
     click.echo("The harvester will monitor a path on the server for changes and upload files.")
     click.echo(("You must be a Team administrator to create a monitored path. "
                 "Note that Lab administrators are not necessarily Team administrators."))
@@ -92,7 +93,7 @@ def create_monitored_path(
         teams = teams_administered[page:page + page_size]
         has_prev = page != 0
         has_next = len(teams_administered) > ((page + 1) * page_size)
-        click.echo("Press a number for the Team that will own this Harvester.")
+        click.echo("Press a number for the Team that will own this Monitored Path.")
         for i, r in enumerate(teams):
             s = f"{i}: {r['name']}"
             click.echo(s)

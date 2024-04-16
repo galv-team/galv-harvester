@@ -13,6 +13,7 @@ import time
 import json
 import dask.dataframe
 import requests
+import fastnumbers
 
 from . import settings
 from .parse.exceptions import UnsupportedFileTypeError
@@ -42,6 +43,7 @@ class HarvestProcessor:
     ]
 
     def __init__(self, file_path: str, monitored_path: dict):
+        self.mapping = None
         self.file_path = file_path
         self.monitored_path = monitored_path
         for input_file_cls in self.registered_input_files:
@@ -92,15 +94,16 @@ class HarvestProcessor:
         self._report_file_metadata()
         column_time = time.time()
         logger.info(f"Metadata reported in {column_time - metadata_time:.2f} seconds")
-        self._report_column_metadata()
-        data_prep_time = time.time()
-        logger.info(f"Column metadata reported in {data_prep_time - column_time:.2f} seconds")
-        self._prepare_data()
-        upload_time = time.time()
-        logger.info(f"Data prepared in {upload_time - data_prep_time:.2f} seconds")
-        self._upload_data()
-        logger.info(f"Data uploaded in {time.time() - upload_time:.2f} seconds")
-        self._delete_temp_files()
+        self._report_summary()
+        if self.mapping is not None:
+            data_prep_time = time.time()
+            logger.info(f"Column metadata reported in {data_prep_time - column_time:.2f} seconds")
+            self._prepare_data()
+            upload_time = time.time()
+            logger.info(f"Data prepared in {upload_time - data_prep_time:.2f} seconds")
+            self._upload_data()
+            logger.info(f"Data uploaded in {time.time() - upload_time:.2f} seconds")
+            self._delete_temp_files()
 
     def _report_file_metadata(self):
         """
@@ -132,30 +135,23 @@ class HarvestProcessor:
             raise RuntimeError("API Error: server responded with error")
         self.server_metadata = report.json()['upload_info']
 
-    def _report_column_metadata(self):
+    def _report_summary(self):
         """
         Report the column metadata to the server.
         Data include the column names, types, units, and whether they relate to recognised standard columns.
         """
-        columns = self.server_metadata.get('columns')
-        if len(columns):
-            mapping = {c.get('name'): c.get('id') for c in columns}
-        else:
-            mapping = self.input_file.get_file_column_to_standard_column_mapping()
+        summary_row_count = 10
+        summary_data = []
+        iterator = self.input_file.load_data(
+            self.file_path,
+            [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
+        )
+        for row in iterator:
+            summary_data.append(row)
+            if len(summary_data) >= summary_row_count:
+                break
 
-        # Use first row to determine column data types
-        columns_with_data = [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
-        first_row = next(self.input_file.load_data(self.input_file.file_path, columns_with_data))
-        column_data = {}
-
-        for k, v in first_row.items():
-            column_data[k] = {'data_type': type(v).__name__}
-            if k in mapping:
-                column_data[k]['column_type_id'] = mapping[k]
-            else:
-                column_data[k]['column_name'] = k
-                if 'unit' in self.input_file.column_info[k]:
-                    column_data[k]['unit_symbol'] = self.input_file.column_info[k].get('unit')
+        summary = pandas.DataFrame(summary_data)
 
         # Upload results
         report = report_harvest_result(
@@ -163,8 +159,8 @@ class HarvestProcessor:
             monitored_path_uuid=self.monitored_path.get('uuid'),
             content={
                 'task': settings.HARVESTER_TASK_IMPORT,
-                'stage': settings.HARVEST_STAGE_COLUMN_METADATA,
-                'data': column_data
+                'stage': settings.HARVEST_STAGE_DATA_SUMMARY,
+                'data': summary.to_json()
             }
         )
         if report is None:
@@ -177,13 +173,62 @@ class HarvestProcessor:
                 logger.error(f"Report Column Metadata - API Error: {report.status_code}")
             raise RuntimeError("API Error: server responded with error")
 
+        mapping_url = report.json()['mapping']
+        if mapping_url is None:
+            logger.info("Mapping could not be automatically determined. Will revisit when user determines mapping.")
+            return
+        mapping_request = requests.get(mapping_url, headers={'Authorization': f"Harvester {get_setting('api_key')}"})
+        if mapping_request is None:
+            logger.error(f"Report Column Metadata - API Error: no response from server")
+            raise RuntimeError("API Error: no response from server")
+        if not mapping_request.ok:
+            try:
+                logger.error(f"Report Column Metadata - API responded with Error: {mapping_request.json()['error']}")
+            except BaseException:
+                logger.error(f"Report Column Metadata - API Error: {mapping_request.status_code}")
+            raise RuntimeError("API Error: server responded with error")
+        self.mapping = mapping_request.json().get('rendered_map')
+        if not self.mapping:
+            if mapping_request:
+                logger.error(f"Server returned mapping request but no mapping was found")
+            else:
+                logger.info("Mapping could not be automatically determined")
+
     def _prepare_data(self):
         """
         Read the data from the file and save it as a temporary .parquet file self.data_file
         """
+        def remap(df, mapping):
+            """
+            Remap the columns in the dataframe according to the mapping.
+            """
+            columns = list(df.columns)
+            for col_name, mapping in mapping.items():
+                new_name = mapping['new_name']
+                if mapping['data_type'] in ["bool", "str"]:
+                    df[new_name] = df[col_name].astype(mapping["data_type"])
+                elif mapping['data_type'] == 'datetime64[ns]':
+                    df[new_name] = pandas.to_datetime(df[col_name])
+                else:
+                    if mapping['data_type'] == 'int':
+                        df[new_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
+                    else:
+                        df[new_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+
+                    addition = mapping.get('addition', 0)
+                    multiplier = mapping.get('multiplier', 1)
+                    df[new_name] = df[new_name] + addition
+                    df[new_name] = df[new_name] * multiplier
+                df.drop(columns=[col_name], inplace=True)
+                columns.pop(columns.index(col_name))
+            # If there are any columns left, they are not in the mapping and should be converted to floats
+            for col_name in columns:
+                df[col_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+            return df
+
         def partition_generator(generator, partition_line_count=100_000):
             def to_df(rows):
-                return pandas.DataFrame(rows)
+                return remap(pandas.DataFrame(rows), mapping=self.mapping)
 
             stopping = False
             while not stopping:
@@ -301,16 +346,98 @@ if False:
     import pandas
     import dask.dataframe
     import shutil
+    import fastnumbers
+    import math
     from harvester.settings import get_standard_units, get_standard_columns
-    from harvester.parse.biologic_input_file import BiologicMprInputFile
+    from harvester.parse.maccor_input_file import MaccorInputFile
     os.system('cp .harvester/.harvester.json /harvester_files')
     standard_units = get_standard_units()
     standard_columns = get_standard_columns()
-    file_path = '.test-data/test-suite-small/adam_3_C05.mpr'
-    input_file = BiologicMprInputFile(file_path, standard_units=standard_units, standard_columns=standard_columns)
-    def partition_generator(generator, partition_line_count = 100_000_000):
+    file_path = '.test-data/test-suite-small/TPG1+-+Cell+15+-+002.txt'
+    input_file = MaccorInputFile(file_path, standard_units=standard_units, standard_columns=standard_columns)
+
+    mapping = {
+        "Amps": {
+            "new_name": "Current_A",
+            "data_type": "float",
+            "multiplier": 0.001,
+            "addition": 0
+        },
+        "Rec#": {
+            "new_name": "Sample_number",
+            "data_type": "int",
+            "multiplier": 1,
+            "addition": 0
+        },
+        "Step": {
+            "new_name": "Step_number",
+            "data_type": "int",
+            "multiplier": 1,
+            "addition": 0
+        },
+        "State": {
+            "new_name": "State",
+            "data_type": "str"
+        },
+        "Volts": {
+            "new_name": "Voltage_V",
+            "data_type": "float",
+            "multiplier": 1,
+            "addition": 0
+        },
+        "Temp 1": {
+            "new_name": "Temperature_K",
+            "data_type": "float",
+            "multiplier": 1,
+            "addition": 273.15
+        },
+        "DPt Time": {
+            "new_name": "Datetime",
+            "data_type": "datetime64[ns]"
+        },
+        "StepTime": {
+            "new_name": "Step_time_s",
+            "data_type": "float",
+            "multiplier": 1,
+            "addition": 0
+        },
+        "TestTime": {
+            "new_name": "Elapsed_time_s",
+            "data_type": "float",
+            "multiplier": 1,
+            "addition": 0
+        }
+    }
+
+    def remap(df, mapping):
+        columns = list(df.columns)
+        for col_name, mapping in mapping.items():
+            new_name = mapping['new_name']
+            if mapping['data_type'] in ["bool", "str"]:
+                df[new_name] = df[col_name].astype(mapping["data_type"])
+            elif mapping['data_type'] == 'datetime64[ns]':
+                df[new_name] = pandas.to_datetime(df[col_name])
+            else:
+                if mapping['data_type'] == 'int':
+                    df[new_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
+                else:
+                    df[new_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+
+                addition = mapping.get('addition', 0)
+                multiplier = mapping.get('multiplier', 1)
+                df[new_name] = df[new_name] + addition
+                df[new_name] = df[new_name] * multiplier
+            df.drop(columns=[col_name], inplace=True)
+            columns.pop(columns.index(col_name))
+        # If there are any columns left, they are not in the mapping and should be converted to floats
+        for col_name in columns:
+            df[col_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+        return df
+
+    def partition_generator(generator, partition_line_count=100_000):
         def to_df(rows):
-            return pandas.DataFrame(rows)
+            return remap(pandas.DataFrame(rows), mapping=mapping)
+
         stopping = False
         while not stopping:
             rows = []
@@ -321,22 +448,19 @@ if False:
                 stopping = True
             yield to_df(rows)
 
-    generator = input_file.load_data(
+    partition_line_count = 10_000
+
+    reader = input_file.load_data(
         file_path,
         [c for c in input_file.column_info.keys() if input_file.column_info[c].get('has_data')]
     )
 
-    data = dask.dataframe.from_map(pandas.DataFrame, partition_generator(generator, partition_line_count=100000))
-    data.compute()
-    print(f"Partitions: {data.npartitions}")
-    data.to_parquet(
-        "test.tmp.parquet",
-        write_index=False,
-        compute=True,
-        custom_metadata={
-            'galv-harvester-version': '0.1.0'
-        }
+    data = dask.dataframe.from_map(
+        pandas.DataFrame,
+        partition_generator(reader, partition_line_count=partition_line_count)
     )
+
+    data.compute()
     print(f"Rows: {data.shape[0].compute()}")
     # Then we would upload the data by getting presigned URLs for each partition
     shutil.rmtree("test.tmp.parquet")

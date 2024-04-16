@@ -75,7 +75,7 @@ def harvest_path(monitored_path: dict):
                         result = result.json()
                         status = result['state']
                         logger.info(f"Server assigned status '{status}'")
-                        if status in ['STABLE', 'RETRY IMPORT']:
+                        if status in ['STABLE', 'RETRY IMPORT', 'MAP ASSIGNED']:
                             logger.info(f"Parsing file {file_path}")
                             try:
                                 file.harvest()

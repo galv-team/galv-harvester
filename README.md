@@ -55,7 +55,7 @@ If you launch the program using the commands above, you will be prompted to ente
 
 ### Using the setup wizard
 
-First, you'll be asked for the Galv server URL.
+First, you'll be asked for the [Galv server](https://github.com/Battery-Intelligence-Lab/galv-backend) URL.
 This should be the URL of the Galv server you have set up.
 Providing a frontend URL will not work, as the harvester needs to communicate with the backend.
 

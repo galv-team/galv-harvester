@@ -251,7 +251,7 @@ class TestHarvester(unittest.TestCase):
             additional_checks(mock_report.call_args_list)
 
     def validate_report_calls(self, calls):
-        stages = ['file metadata', 'column metadata', 'upload parquet partitions', 'upload complete']
+        stages = ['file metadata', 'data summary', 'upload parquet partitions', 'upload complete']
         upload_fired = False
         for c in calls:
             if not 'content' in c.kwargs:
@@ -284,7 +284,7 @@ class TestHarvester(unittest.TestCase):
                         for k in ['core_metadata', 'extra_metadata', 'test_date', 'parser']:
                             if k not in data:
                                 raise AssertionError(f"Expected file_metadata report to contain {k}")
-                    elif s == settings.HARVEST_STAGE_COLUMN_METADATA:
+                    elif s == settings.HARVEST_STAGE_DATA_SUMMARY:
                         if not isinstance(data, dict):
                             raise AssertionError(f"Expected column_metadata report to contain a dict of columns")
                     elif s == settings.HARVEST_STAGE_UPLOAD_COMPLETE:
