@@ -188,7 +188,7 @@ class HarvestProcessor:
                 logger.error(f"Report Column Metadata - API Error: {mapping_request.status_code}")
             raise RuntimeError("API Error: server responded with error")
         self.mapping = mapping_request.json().get('rendered_map')
-        if not self.mapping:
+        if not isinstance(self.mapping, dict):
             if mapping_request:
                 logger.error(f"Server returned mapping request but no mapping was found")
             else:
@@ -204,22 +204,24 @@ class HarvestProcessor:
             """
             columns = list(df.columns)
             for col_name, mapping in mapping.items():
-                new_name = mapping['new_name']
+                new_name = mapping.get('new_name')
+                if new_name in df.columns and new_name != col_name:
+                    raise ValueError(f"New name '{new_name}' already exists in the dataframe")
                 if mapping['data_type'] in ["bool", "str"]:
-                    df[new_name] = df[col_name].astype(mapping["data_type"])
+                    df[col_name] = df[col_name].astype(mapping["data_type"])
                 elif mapping['data_type'] == 'datetime64[ns]':
-                    df[new_name] = pandas.to_datetime(df[col_name])
+                    df[col_name] = pandas.to_datetime(df[col_name])
                 else:
                     if mapping['data_type'] == 'int':
-                        df[new_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
+                        df[col_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
                     else:
-                        df[new_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+                        df[col_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
 
                     addition = mapping.get('addition', 0)
                     multiplier = mapping.get('multiplier', 1)
-                    df[new_name] = df[new_name] + addition
-                    df[new_name] = df[new_name] * multiplier
-                df.drop(columns=[col_name], inplace=True)
+                    df[col_name] = df[col_name] + addition
+                    df[col_name] = df[col_name] * multiplier
+                df.rename(columns={col_name: new_name}, inplace=True)
                 columns.pop(columns.index(col_name))
             # If there are any columns left, they are not in the mapping and should be converted to floats
             for col_name in columns:

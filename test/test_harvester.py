@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
-
+import json
 import unittest
 from unittest.mock import patch
 import os
@@ -224,10 +224,11 @@ class TestHarvester(unittest.TestCase):
                     raise AssertionError(f"{f} did not make call with 'task'={task}")
 
     @patch('requests.post')
+    @patch('requests.get')
     @patch('harvester.harvest.report_harvest_result')
     @patch('harvester.harvest.logger')
     @patch('harvester.settings.get_settings')
-    def import_file(self, filename, mock_settings, mock_logger, mock_report, mock_post, additional_checks=None):
+    def import_file(self, filename, mock_settings, mock_logger, mock_report, mock_get, mock_post, additional_checks=None):
         mock_settings.return_value = ConfigResponse().json()
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(
@@ -235,16 +236,13 @@ class TestHarvester(unittest.TestCase):
             # An amalgam of the expected report content for different calls
             {
                 'upload_info': {'last_record_number': 0, 'columns': []},
-                'storage_urls': [
-                    {'url': 'http://localhost', 'fields': []},
-                    {'url': 'http://localhost', 'fields': []},
-                    {'url': 'http://localhost', 'fields': []}
-                ]
+                'mapping': 'http://localhost'
             }
         )
+        mock_get.return_value = JSONResponse(200, {'rendered_map': {}})
         mock_post.return_value = JSONResponse(204, {})
         harvester.harvest.HarvestProcessor(
-                os.path.join(get_test_file_path(), filename), mock_settings.monitored_paths[0]
+                os.path.join(get_test_file_path(), filename), ConfigResponse().json()["monitored_paths"][0]
         ).harvest()
         self.validate_report_calls(mock_report.call_args_list)
         if additional_checks:
@@ -285,8 +283,8 @@ class TestHarvester(unittest.TestCase):
                             if k not in data:
                                 raise AssertionError(f"Expected file_metadata report to contain {k}")
                     elif s == settings.HARVEST_STAGE_DATA_SUMMARY:
-                        if not isinstance(data, dict):
-                            raise AssertionError(f"Expected column_metadata report to contain a dict of columns")
+                        if not isinstance(data, str) or not isinstance(json.loads(data), dict):
+                            raise AssertionError(f"Expected data summary to be JSON representation of a dictionary")
                     elif s == settings.HARVEST_STAGE_UPLOAD_COMPLETE:
                         if 'successes' not in data:
                             raise AssertionError(f"Expected upload completion report to contain success count")
