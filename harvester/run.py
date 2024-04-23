@@ -65,7 +65,7 @@ def harvest_path(monitored_path: dict):
                     logger.info(f"Reporting stats for {file_path}")
                     result = report_harvest_result(
                         path=full_path,
-                        monitored_path_uuid=monitored_path.get('uuid'),
+                        monitored_path_id=monitored_path.get('id'),
                         content={
                             'task': settings.HARVESTER_TASK_FILE_SIZE,
                             'size': os.stat(full_path).st_size
@@ -81,7 +81,7 @@ def harvest_path(monitored_path: dict):
                                 file.harvest()
                                 report_harvest_result(
                                     path=full_path,
-                                    monitored_path_uuid=monitored_path.get('uuid'),
+                                    monitored_path_id=monitored_path.get('id'),
                                     content={
                                         'task': settings.HARVESTER_TASK_IMPORT,
                                         'stage': settings.HARVEST_STAGE_COMPLETE
@@ -94,7 +94,7 @@ def harvest_path(monitored_path: dict):
                                     logger.warning(traceback.format_exc())
                                 report_harvest_result(
                                     path=full_path,
-                                    monitored_path_uuid=monitored_path.get('uuid'),
+                                    monitored_path_id=monitored_path.get('id'),
                                     content={
                                         'task': settings.HARVESTER_TASK_IMPORT,
                                         'stage': settings.HARVEST_STAGE_FAILED,
@@ -105,14 +105,14 @@ def harvest_path(monitored_path: dict):
                     logger.error(f"{e.__class__.__name__}: {e}")
                     report_harvest_result(
                         path=full_path,
-                        monitored_path_uuid=monitored_path.get('uuid'),
+                        monitored_path_id=monitored_path.get('id'),
                         error=e
                     )
         logger.info(f"Completed directory walking of {path}")
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")
         report_harvest_result(
-            monitored_path_uuid=monitored_path.get('uuid'),
+            monitored_path_id=monitored_path.get('id'),
             error=e,
             path=path
         )

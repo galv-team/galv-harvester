@@ -16,7 +16,7 @@ logger = get_logger(__file__)
 
 def report_harvest_result(
         path: os.PathLike|str,
-        monitored_path_uuid: str,
+        monitored_path_id: str,
         content=None,
         error: BaseException = None,
         **kwargs  # passed to requests.post
@@ -28,7 +28,7 @@ def report_harvest_result(
         else:
             data = {'status': settings.HARVESTER_STATUS_SUCCESS, 'content': content}
         data['path'] = path
-        data['monitored_path_uuid'] = monitored_path_uuid
+        data['monitored_path_id'] = monitored_path_id
         logger.debug(f"{get_setting('url')}report/; {json.dumps(data, cls=NpEncoder)}")
         out = requests.post(
             f"{get_setting('url')}report/",

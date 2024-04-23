@@ -112,7 +112,7 @@ class HarvestProcessor:
         core_metadata, extra_metadata = self.input_file.load_metadata()
         report = report_harvest_result(
             path=self.file_path,
-            monitored_path_uuid=self.monitored_path.get('uuid'),
+            monitored_path_id=self.monitored_path.get('id'),
             content={
                 'task': settings.HARVESTER_TASK_IMPORT,
                 'stage': settings.HARVEST_STAGE_FILE_METADATA,
@@ -156,7 +156,7 @@ class HarvestProcessor:
         # Upload results
         report = report_harvest_result(
             path=self.file_path,
-            monitored_path_uuid=self.monitored_path.get('uuid'),
+            monitored_path_id=self.monitored_path.get('id'),
             content={
                 'task': settings.HARVESTER_TASK_IMPORT,
                 'stage': settings.HARVEST_STAGE_DATA_SUMMARY,
@@ -283,13 +283,13 @@ class HarvestProcessor:
             files = {'parquet_file': (filename, open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb'))}
             report = report_harvest_result(
                 path=self.file_path,
-                monitored_path_uuid=self.monitored_path.get('uuid'),
+                monitored_path_id=self.monitored_path.get('id'),
                 # send data in a flat format to accompany file upload protocol.
                 # Kinda hacky because it overwrites much of report_harvest_result's functionality
                 data={
                     'status': settings.HARVESTER_STATUS_SUCCESS,
                     'path': self.file_path,
-                    'monitored_path_uuid': self.monitored_path.get('uuid'),
+                    'monitored_path_id': self.monitored_path.get('id'),
                     'task': settings.HARVESTER_TASK_IMPORT,
                     'stage': settings.HARVEST_STAGE_UPLOAD_PARQUET,
                     'total_row_count': self.row_count,
@@ -320,7 +320,7 @@ class HarvestProcessor:
 
         report_harvest_result(
             path=self.file_path,
-            monitored_path_uuid=self.monitored_path.get('uuid'),
+            monitored_path_id=self.monitored_path.get('id'),
             content={
                 'task': settings.HARVESTER_TASK_IMPORT,
                 'stage': settings.HARVEST_STAGE_UPLOAD_COMPLETE,

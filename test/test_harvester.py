@@ -27,7 +27,7 @@ class ConfigResponse:
             "sleep_time": 0,
             "monitored_paths": [
                 {
-                    "uuid": "1f6852da-3d2d-46ce-a6c6-70b602fd0e84",
+                    "id": "1f6852da-3d2d-46ce-a6c6-70b602fd0e84",
                     "path": get_test_file_path(),
                     "stable_time": 0,
                     "regex": "^(?!.*\\.skip$).*$",
