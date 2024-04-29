@@ -210,7 +210,7 @@ class HarvestProcessor:
                 if mapping['data_type'] in ["bool", "str"]:
                     df[col_name] = df[col_name].astype(mapping["data_type"])
                 elif mapping['data_type'] == 'datetime64[ns]':
-                    df[col_name] = pandas.to_datetime(df[col_name])
+                    df[col_name] = pandas.to_datetime(df[col_name], format='ISO8601')
                 else:
                     if mapping['data_type'] == 'int':
                         df[col_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
