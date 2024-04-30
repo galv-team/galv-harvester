@@ -77,6 +77,7 @@ cov = [
     "test-cov",
     "cov-report",
 ]
+test-cli = "galv-harvester --help"
 
 [tool.hatch.envs.types]
 dependencies = [

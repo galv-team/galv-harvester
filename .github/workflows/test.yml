@@ -76,7 +76,7 @@ jobs:
         run: hatch run +py=${{ matrix.python-version }} test
 
       - name: Test CLI
-        run: hatch shell +py=${{ matrix.python-version }} -- -c "galv-harvester --help"
+        run: hatch run +py=${{ matrix.python-version }} test-cli
 
       - name: Build dist
         run: hatch build
