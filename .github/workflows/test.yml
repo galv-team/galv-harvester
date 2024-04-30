@@ -17,8 +17,8 @@ jobs:
     strategy:
       matrix:
         # Python versions to test against - using GH matrix to run in parallel
-        # Each version should be in pyproject.toml[tool.hatch.envs.all.matrix]
-        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
+        # Each version should be in pyproject.toml[[tool.hatch.envs.default.matrix]].python
+        python-version: [ "3.9", "3.10", "3.11", "3.12" ]
 
     steps:
       - uses: actions/checkout@v3
