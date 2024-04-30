@@ -23,7 +23,7 @@ from .harvest import HarvestProcessor
 logger = get_logger(__file__)
 
 
-def split_path(core_path: os.PathLike|str, path: os.PathLike|str) -> (os.PathLike, os.PathLike):
+def split_path(core_path, path) -> (os.PathLike, os.PathLike):
     """
     Split a path into the base path property and the rest
     """

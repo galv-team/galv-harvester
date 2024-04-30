@@ -13,7 +13,7 @@ import requests
 from . import run, settings
 
 
-def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs) -> object|list:
+def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs):
     while retries > 0:
         try:
             if data is None:
