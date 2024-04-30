@@ -4,7 +4,7 @@
 
 from .exceptions import UnsupportedFileTypeError
 import traceback
-from ..settings import get_logger
+from src.harvester.settings import get_logger
 
 # see https://gist.github.com/jsheedy/ed81cdf18190183b3b7d
 # https://stackoverflow.com/a/30721460

@@ -7,8 +7,8 @@ import re
 import time
 import traceback
 
-from harvester import settings
-from .parse.exceptions import UnsupportedFileTypeError
+from src.harvester import settings
+from src.harvester.parse.exceptions import UnsupportedFileTypeError
 from .settings import get_logger, get_setting
 from .api import report_harvest_result, update_config
 from .harvest import HarvestProcessor

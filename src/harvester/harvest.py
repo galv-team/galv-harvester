@@ -3,30 +3,24 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import datetime
-import shutil
 
-import math
-import pandas
-import os
 import tempfile
 import time
-import json
 import dask.dataframe
 import requests
-import fastnumbers
 
 from . import settings
-from .parse.exceptions import UnsupportedFileTypeError
-from .parse.ivium_input_file import IviumInputFile
-from .parse.biologic_input_file import BiologicMprInputFile
-from .parse.maccor_input_file import (
+from src.harvester.parse.exceptions import UnsupportedFileTypeError
+from src.harvester.parse.ivium_input_file import IviumInputFile
+from src.harvester.parse.biologic_input_file import BiologicMprInputFile
+from src.harvester.parse.maccor_input_file import (
     MaccorInputFile,
     MaccorExcelInputFile,
     MaccorRawInputFile,
 )
-from .parse.delimited_input_file import DelimitedInputFile
+from src.harvester.parse.delimited_input_file import DelimitedInputFile
 
-from .settings import get_logger, get_standard_units, get_standard_columns, VERSION, get_setting
+from .settings import get_logger, VERSION, get_setting
 from .api import report_harvest_result
 
 logger = get_logger(__file__)
@@ -350,8 +344,8 @@ if False:
     import shutil
     import fastnumbers
     import math
-    from harvester.settings import get_standard_units, get_standard_columns
-    from harvester.parse.maccor_input_file import MaccorInputFile
+    from src.harvester.settings import get_standard_units, get_standard_columns
+    from src.harvester.parse.maccor_input_file import MaccorInputFile
     os.system('cp .harvester/.harvester.json /harvester_files')
     standard_units = get_standard_units()
     standard_columns = get_standard_columns()
