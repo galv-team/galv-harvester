@@ -54,6 +54,9 @@ packages = ["src/galv_harvester"]
 [tool.hatch.version]
 path = "src/galv_harvester/__about__.py"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.envs.default]
 # Allow PyCharm to detect the virtual environment interpreter
 type = "virtual"
