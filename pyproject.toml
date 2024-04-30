@@ -50,8 +50,8 @@ packages = ["src/galv_harvester"]
 [tool.hatch.version]
 path = "src/galv_harvester/__about__.py"
 
-#[[tool.hatch.envs.all.matrix]]
-#python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+[[tool.hatch.envs.all.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 [tool.hatch.envs.default]
 # Allow PyCharm to detect the virtual environment interpreter
@@ -61,9 +61,6 @@ dependencies = [
   "coverage[toml]>=6.5",
   "pytest",
 ]
-
-[[tool.hatch.envs.default.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"

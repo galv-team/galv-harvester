@@ -71,7 +71,10 @@ jobs:
           python -m pip install hatch
 
       - name: Tests
-        run: hatch run +py=${{ matrix.python-version }} test:test
+        run: hatch run +py=${{ matrix.python-version }} test
+
+      - name: Test CLI
+        run: hatch shell +py=${{ matrix.python-version }} -- -c "galv-harvester --help"
 
       - name: Build dist
         run: hatch build
