@@ -23,7 +23,7 @@ jobs:
         python-version: [ "3.9", "3.10", "3.11", "3.12" ]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # Enable tmate debugging of manually-triggered workflows if the input option was provided
       - name: Setup tmate session
@@ -38,7 +38,7 @@ jobs:
 
       - name: Restore cached test suite
         id: cache-restore
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
           key: liionsden-test-suite-small-v1
@@ -57,14 +57,14 @@ jobs:
       - name: Cache test suite
         id: cache-save
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
       # Setup the appropriate Python version, hatch, and the dependencies
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
