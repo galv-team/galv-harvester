@@ -50,6 +50,9 @@ packages = ["src/galv_harvester"]
 [tool.hatch.version]
 path = "src/galv_harvester/__about__.py"
 
+[tool.hatch.envs.all.matrix]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
 [tool.hatch.envs.default]
 # Allow PyCharm to detect the virtual environment interpreter
 type = "virtual"
@@ -70,9 +73,6 @@ cov = [
   "test-cov",
   "cov-report",
 ]
-
-[[tool.hatch.envs.all.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 [tool.hatch.envs.types]
 dependencies = [
