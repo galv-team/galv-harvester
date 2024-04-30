@@ -1,21 +1,19 @@
 # SPDX-License-Identifier: BSD-2-Clause
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
-import base64
+import json
 import os.path
+import re
+import subprocess
 import time
 
 import click
-import re
-import json
 import requests
-import subprocess
-import harvester.run
-import harvester.settings
-from getpass import getpass
+
+from . import run, settings
 
 
-def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs) -> object|list:
+def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs):
     while retries > 0:
         try:
             if data is None:
@@ -59,9 +57,10 @@ def create_monitored_path(
         api_url, api_token, harvester_uuid, specified,
         team_id, monitor_path, monitor_path_regex
 ) -> None:
+    # TODO: Ensure that the team is a member of the harvester's lab
     click.echo("The harvester will monitor a path on the server for changes and upload files.")
-    click.echo(("You must be a Team administrator to create a monitored path. "
-                "Note that Lab administrators are not necessarily Team administrators."))
+    click.echo("You must be a Team administrator to create a monitored path. "
+                "Note that Lab administrators are not necessarily Team administrators.")
 
     def monitored_path_exit(error: str):
         click.echo('Harvester successfully created, but the monitored path could not be set.')
@@ -92,7 +91,7 @@ def create_monitored_path(
         teams = teams_administered[page:page + page_size]
         has_prev = page != 0
         has_next = len(teams_administered) > ((page + 1) * page_size)
-        click.echo("Press a number for the Team that will own this Harvester.")
+        click.echo("Press a number for the Team that will own this Monitored Path.")
         for i, r in enumerate(teams):
             s = f"{i}: {r['name']}"
             click.echo(s)
@@ -321,7 +320,7 @@ def register(
     )
 
     # Save credentials
-    file_name = harvester.settings.get_settings_file()
+    file_name = settings.get_settings_file()
     with open(file_name, 'w+') as f:
         json.dump(result, f)
         click.echo("Details:")
@@ -337,21 +336,22 @@ def register(
             team_id=team_id, monitor_path=monitor_path, monitor_path_regex=monitor_path_regex
         )
 
-    click.echo((
+    click.echo(
         f"You can configure this harvester's details by visiting the API at "
         f"{url} or going to the frontend."
-    ))
+    )
     click.echo("")
     click.echo("The harvester will check for updates frequently until you change its polling rate when you update it.")
     click.echo("Launching harvester...")
     if run_foreground:
-        harvester.run.run_cycle()
+        run.run_cycle()
     else:
-        subprocess.Popen(["python", "-m", "harvester.run"])
-        click.echo(f"Complete. Harvester is running and logging to {harvester.settings.get_logfile()}")
+        subprocess.Popen(["python", "-m", "run"])
+        click.echo(f"Complete. Harvester is running and logging to {settings.get_logfile()}")
 
 
 @click.command()
+@click.version_option()
 @click.option('--url', type=str, help="API URL to register harvester with.")
 @click.option('--name', type=str, help="Name for the harvester.")
 @click.option('--api_token', type=str, help="Your API token. You must have admin access to at least one Lab.")
@@ -382,9 +382,9 @@ def click_wrapper(
     if restart:
         click.echo("Attempting to restart harvester.")
         # Check whether a config file already exists, if so, use it
-        if harvester.settings.get_setting('url'):
+        if settings.get_setting('url'):
             click.echo("Config file found, restarting harvester.")
-            harvester.run.run_cycle()
+            run.run_cycle()
             return
         else:
             click.echo("No config file found, continuing to setup.")

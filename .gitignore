@@ -21,3 +21,5 @@ env
 .schema/
 docs/build/
 *.pptx
+
+.coverage.*

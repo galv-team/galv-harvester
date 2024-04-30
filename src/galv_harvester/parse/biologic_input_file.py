@@ -21,24 +21,6 @@ class BiologicMprInputFile(InputFile):
         super().__init__(file_path, **kwargs)
         self.logger.info("Type is BioLogic")
 
-    def get_file_column_to_standard_column_mapping(self) -> dict:
-        """
-        Return a dict with a key of the column name in the file that maps to
-        the standard column name in the value. Only return values where a
-        mapping exists
-        """
-        return {
-            "I/mA": self.standard_columns['Amps'],
-            "Ewe/V": self.standard_columns['Volts'],
-            "time/s": self.standard_columns['Time'],
-            "Energy/W.h": self.standard_columns['Energy Capacity'],
-            "Q charge/discharge/mA.h": self.standard_columns['Charge Capacity'],
-            "Aux": self.standard_columns['Temperature'],
-            "|Z|/Ohm": self.standard_columns['Impedence Magnitude'],
-            "Phase(Z)/deg": self.standard_columns['Impedence Phase'],
-            "freq/Hz": self.standard_columns['Frequency'],
-        }
-
     def load_data(self, file_path, columns):
         columns_of_interest = []
         column_names = list(self.mpr_file.data.dtype.names)
@@ -101,14 +83,13 @@ class BiologicMprInputFile(InputFile):
 
                 yield data_label
 
-
     def load_metadata(self):
         file_path = self.file_path
-        metadata = {}
-        metadata["Machine Type"] = "BioLogic"
-        metadata["Dataset Name"] = \
-            os.path.splitext(ntpath.basename(file_path))[0]
-        metadata["Date of Test"] = self.mpr_file.startdate
+        metadata = {
+            "Machine Type": "BioLogic",
+            "Dataset Name": os.path.splitext(ntpath.basename(file_path))[0],
+            "Date of Test": self.mpr_file.startdate
+        }
 
         columns_with_data = {
             name: {
@@ -117,10 +98,6 @@ class BiologicMprInputFile(InputFile):
             }
             for name in self.mpr_file.data.dtype.names
         }
-        for name, data in columns_with_data.items():
-            for unit in self.standard_units:
-                if name[-len(unit):] == unit:
-                    data['unit'] = unit
 
         metadata["num_rows"] = len(self.mpr_file.data)
         # if sample number not provided by file then we count from 0

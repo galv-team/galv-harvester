@@ -16,7 +16,7 @@ logging.basicConfig(
 
 
 def get_logfile() -> pathlib.Path:
-    return pathlib.Path(os.getenv('LOG_FILE', "/harvester_files/harvester.log"))
+    return pathlib.Path(os.getenv('GALV_HARVESTER_LOG_FILE', "/harvester_files/harvester.log"))
 
 
 def get_logger(name):
@@ -37,7 +37,7 @@ logger = get_logger(__file__)
 
 
 def get_settings_file() -> pathlib.Path:
-    return pathlib.Path(os.getenv('SETTINGS_FILE', "/harvester_files/.harvester.json"))
+    return pathlib.Path(os.getenv('GALV_HARVESTER_SETTINGS_FILE', "/harvester_files/.harvester.json"))
 
 
 def get_settings():
@@ -86,3 +86,15 @@ def update_envvars():
         if old is not None:
             logger.info(f"Unsetting envvar {k} (previous value: {old})")
         os.unsetenv(k)
+
+# These definitions should be kept in sync with the definitions in the backend
+HARVESTER_TASK_FILE_SIZE = 'file_size'
+HARVESTER_TASK_IMPORT = 'import'
+HARVESTER_STATUS_SUCCESS = 'success'
+HARVESTER_STATUS_ERROR = 'error'
+HARVEST_STAGE_FILE_METADATA = 'file metadata'
+HARVEST_STAGE_DATA_SUMMARY = 'data summary'
+HARVEST_STAGE_UPLOAD_PARQUET = 'upload parquet partitions'
+HARVEST_STAGE_UPLOAD_COMPLETE = 'upload complete'
+HARVEST_STAGE_COMPLETE = 'harvest complete'
+HARVEST_STAGE_FAILED = 'harvest failed'

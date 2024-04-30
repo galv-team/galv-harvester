@@ -2,8 +2,9 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
-import os
 import json
+
+from . import settings
 from .utils import NpEncoder
 import requests
 from .settings import get_setting, get_settings, get_settings_file, get_logger, update_envvars
@@ -13,27 +14,29 @@ logger = get_logger(__file__)
 
 
 def report_harvest_result(
-        path: os.PathLike|str,
-        monitored_path_uuid: int,
+        path,
+        monitored_path_id: str,
         content=None,
-        error: BaseException = None
+        error: BaseException = None,
+        **kwargs  # passed to requests.post
 ):
     start = time.time()
     try:
         if error is not None:
-            data = {'status': 'error', 'error': f"{error.__class__.__name__}: {error}"}
+            data = {'status': settings.HARVESTER_STATUS_ERROR, 'error': f"{error.__class__.__name__}: {error}"}
         else:
-            data = {'status': 'success', 'content': content}
+            data = {'status': settings.HARVESTER_STATUS_SUCCESS, 'content': content}
         data['path'] = path
-        data['monitored_path_uuid'] = monitored_path_uuid
+        data['monitored_path_id'] = monitored_path_id
         logger.debug(f"{get_setting('url')}report/; {json.dumps(data, cls=NpEncoder)}")
         out = requests.post(
             f"{get_setting('url')}report/",
             headers={
                 'Authorization': f"Harvester {get_setting('api_key')}"
             },
-            # encode then decode to ensure np values are converted to standard types
-            json=json.loads(json.dumps(data, cls=NpEncoder))
+            # encode then decode to ensure np values are converted to standard types and null bytes are removed
+            json=json.loads(json.dumps(data, cls=NpEncoder).replace('\\u0000', '')),
+            **kwargs
         )
         try:
             out.json()
@@ -49,7 +52,7 @@ def report_harvest_result(
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")
         out = None
-    logger.info(f"API call finished in {time.time() - start}")
+    logger.info(f"API call finished in {round(time.time() - start, 2)}")
     return out
 
 

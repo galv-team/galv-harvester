@@ -5,16 +5,25 @@
 import os.path
 import re
 import time
+import traceback
 
 from .parse.exceptions import UnsupportedFileTypeError
-from .settings import get_logger, get_setting
+from .settings import (
+    get_logger,
+    get_setting,
+    HARVESTER_TASK_FILE_SIZE,
+    HARVESTER_TASK_IMPORT,
+    HARVEST_STAGE_COMPLETE,
+    HARVESTER_TASK_IMPORT,
+    HARVEST_STAGE_FAILED
+)
 from .api import report_harvest_result, update_config
-from .harvest import import_file, get_import_file_handler
+from .harvest import HarvestProcessor
 
 logger = get_logger(__file__)
 
 
-def split_path(core_path: os.PathLike|str, path: os.PathLike|str) -> (os.PathLike, os.PathLike):
+def split_path(core_path, path) -> (os.PathLike, os.PathLike):
     """
     Split a path into the base path property and the rest
     """
@@ -55,7 +64,7 @@ def harvest_path(monitored_path: dict):
                     logger.debug(f"Skipping {file_path} as it does not match regex {regex}")
                     continue
                 try:
-                    get_import_file_handler(full_path)
+                    file = HarvestProcessor(full_path, monitored_path)
                 except UnsupportedFileTypeError:
                     logger.debug(f"Skipping unsupported file {file_path}")
                     continue
@@ -63,9 +72,9 @@ def harvest_path(monitored_path: dict):
                     logger.info(f"Reporting stats for {file_path}")
                     result = report_harvest_result(
                         path=full_path,
-                        monitored_path_uuid=monitored_path.get('uuid'),
+                        monitored_path_id=monitored_path.get('id'),
                         content={
-                            'task': 'file_size',
+                            'task': HARVESTER_TASK_FILE_SIZE,
                             'size': os.stat(full_path).st_size
                         }
                     )
@@ -73,34 +82,44 @@ def harvest_path(monitored_path: dict):
                         result = result.json()
                         status = result['state']
                         logger.info(f"Server assigned status '{status}'")
-                        if status in ['STABLE', 'RETRY IMPORT']:
+                        if status in ['STABLE', 'RETRY IMPORT', 'MAP ASSIGNED']:
                             logger.info(f"Parsing file {file_path}")
-                            if import_file(full_path, monitored_path):
+                            try:
+                                file.harvest()
                                 report_harvest_result(
                                     path=full_path,
-                                    monitored_path_uuid=monitored_path.get('uuid'),
-                                    content={'task': 'import', 'status': 'complete'}
+                                    monitored_path_id=monitored_path.get('id'),
+                                    content={
+                                        'task': HARVESTER_TASK_IMPORT,
+                                        'stage': HARVEST_STAGE_COMPLETE
+                                    }
                                 )
                                 logger.info(f"Successfully parsed file {file_path}")
-                            else:
-                                logger.warn(f"FAILED parsing file {file_path}")
+                            except BaseException as e:
+                                logger.warning(f"FAILED parsing file {file_path}: {e.__class__.__name__}: {e}")
+                                if e.__traceback__ is not None:
+                                    logger.warning(traceback.format_exc())
                                 report_harvest_result(
                                     path=full_path,
-                                    monitored_path_uuid=monitored_path.get('uuid'),
-                                    content={'task': 'import', 'status': 'failed'}
+                                    monitored_path_id=monitored_path.get('id'),
+                                    content={
+                                        'task': HARVESTER_TASK_IMPORT,
+                                        'stage': HARVEST_STAGE_FAILED,
+                                        'error': f"Error in Harvester. {e.__class__.__name__}: {e}. [See harvester logs for more details]"
+                                    }
                                 )
                 except BaseException as e:
                     logger.error(f"{e.__class__.__name__}: {e}")
                     report_harvest_result(
                         path=full_path,
-                        monitored_path_uuid=monitored_path.get('uuid'),
+                        monitored_path_id=monitored_path.get('id'),
                         error=e
                     )
         logger.info(f"Completed directory walking of {path}")
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")
         report_harvest_result(
-            monitored_path_uuid=monitored_path.get('uuid'),
+            monitored_path_id=monitored_path.get('id'),
             error=e,
             path=path
         )
