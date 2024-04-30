@@ -79,7 +79,7 @@ jobs:
         run: hatch run +py=${{ matrix.python-version }} test-cli
 
       - name: Build dist
-        run: hatch build
+        run: hatch run +py=${{ matrix.python-version }} build
 
       # Publish if on a release tag
       - name: Publish on PyPI

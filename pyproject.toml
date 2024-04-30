@@ -61,6 +61,7 @@ path = ".venv"
 dependencies = [
     "coverage[toml]>=6.5",
     "pytest",
+    "build"
 ]
 
 [[tool.hatch.envs.default.matrix]]
@@ -78,6 +79,7 @@ cov = [
     "cov-report",
 ]
 test-cli = "galv-harvester --help"
+build = "python -m build"  # Build the package in a way we can specify the environment
 
 [tool.hatch.envs.types]
 dependencies = [
