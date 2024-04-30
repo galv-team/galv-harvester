@@ -16,7 +16,7 @@ logging.basicConfig(
 
 
 def get_logfile() -> pathlib.Path:
-    return pathlib.Path(os.getenv('LOG_FILE', "/harvester_files/harvester.log"))
+    return pathlib.Path(os.getenv('GALV_HARVESTER_LOG_FILE', "/harvester_files/harvester.log"))
 
 
 def get_logger(name):
@@ -37,7 +37,7 @@ logger = get_logger(__file__)
 
 
 def get_settings_file() -> pathlib.Path:
-    return pathlib.Path(os.getenv('SETTINGS_FILE', "/harvester_files/.harvester.json"))
+    return pathlib.Path(os.getenv('GALV_HARVESTER_SETTINGS_FILE', "/harvester_files/.harvester.json"))
 
 
 def get_settings():
