@@ -92,12 +92,6 @@ class DelimitedInputFile(InputFile):
         super().__init__(file_path, **kwargs)
         self.logger.info(f"Type is Delimited [{self.dialect.delimiter}]")
 
-    def get_file_column_to_standard_column_mapping(self) -> dict:
-        """
-        No assumptions can be made about the column names in the file
-        """
-        return {}
-
     def load_data(self, file_path, columns):
         if all(isinstance(c, str) for c in columns):
             column_numbers = [self.header.index(c) for c in columns]

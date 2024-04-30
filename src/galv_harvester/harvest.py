@@ -7,26 +7,32 @@ import datetime
 import tempfile
 import time
 import dask.dataframe
+import pandas
+import fastnumbers
+import math
+import os
+import shutil
 import requests
 
 from . import settings
-from src.harvester.parse.exceptions import UnsupportedFileTypeError
-from src.harvester.parse.ivium_input_file import IviumInputFile
-from src.harvester.parse.biologic_input_file import BiologicMprInputFile
-from src.harvester.parse.maccor_input_file import (
+from .parse.exceptions import UnsupportedFileTypeError
+from .parse.ivium_input_file import IviumInputFile
+from .parse.biologic_input_file import BiologicMprInputFile
+from .parse.maccor_input_file import (
     MaccorInputFile,
     MaccorExcelInputFile,
     MaccorRawInputFile,
 )
-from src.harvester.parse.delimited_input_file import DelimitedInputFile
+from .parse.delimited_input_file import DelimitedInputFile
 
-from .settings import get_logger, VERSION, get_setting
 from .api import report_harvest_result
 
-logger = get_logger(__file__)
+from .__about__ import VERSION
+
+logger = settings.get_logger(__file__)
+
 
 class HarvestProcessor:
-
     registered_input_files = [
         BiologicMprInputFile,
         IviumInputFile,
@@ -36,6 +42,18 @@ class HarvestProcessor:
         DelimitedInputFile  # Should be last because it processes files line by line and accepts anything table-like
     ]
 
+    @staticmethod
+    def check_response(step: str, response):
+        if response is None:
+            logger.error(f"{step} failed: no response from server")
+            raise RuntimeError(f"{step} failed: no response from server")
+        if not response.ok:
+            try:
+                logger.error(f"{step} failed: {response.json()['error']}")
+            except BaseException:
+                logger.error(f"{step} failed: received HTTP {response.status_code}")
+            raise RuntimeError("{step}: failed server responded with error")
+
     def __init__(self, file_path: str, monitored_path: dict):
         self.mapping = None
         self.file_path = file_path
@@ -43,14 +61,12 @@ class HarvestProcessor:
         for input_file_cls in self.registered_input_files:
             try:
                 logger.debug('Tried input reader {}'.format(input_file_cls))
-                input_file = input_file_cls(
-                    file_path=file_path,
-                    standard_units=get_standard_units(),
-                    standard_columns=get_standard_columns()
-                )
-            except Exception as e:
+                input_file = input_file_cls(file_path=file_path)
+            except UnsupportedFileTypeError as e:
                 logger.debug('...failed with: ', type(e), e)
                 continue
+            except Exception as e:
+                logger.error(f"{input_file_cls.__name__} failed to import {file_path} with non-UnsupportedFileTypeError: {e}")
             logger.debug('...succeeded...')
             self.input_file = input_file
             self.parser = input_file_cls
@@ -118,15 +134,7 @@ class HarvestProcessor:
                 }
             }
         )
-        if report is None:
-            logger.error(f"Report Metadata - API Error: no response from server")
-            raise RuntimeError("API Error: no response from server")
-        if not report.ok:
-            try:
-                logger.error(f"Report Metadata - API responded with Error: {report.json()['error']}")
-            except BaseException:
-                logger.error(f"Report Metadata - API Error: {report.status_code}")
-            raise RuntimeError("API Error: server responded with error")
+        HarvestProcessor.check_response("Report Metadata", report)
         self.server_metadata = report.json()['upload_info']
 
     def _report_summary(self):
@@ -157,30 +165,17 @@ class HarvestProcessor:
                 'data': summary.to_json()
             }
         )
-        if report is None:
-            logger.error(f"Report Column Metadata - API Error: no response from server")
-            raise RuntimeError("API Error: no response from server")
-        if not report.ok:
-            try:
-                logger.error(f"Report Column Metadata - API responded with Error: {report.json()['error']}")
-            except BaseException:
-                logger.error(f"Report Column Metadata - API Error: {report.status_code}")
-            raise RuntimeError("API Error: server responded with error")
+        HarvestProcessor.check_response("Report Column Metadata", report)
 
         mapping_url = report.json()['mapping']
         if mapping_url is None:
             logger.info("Mapping could not be automatically determined. Will revisit when user determines mapping.")
             return
-        mapping_request = requests.get(mapping_url, headers={'Authorization': f"Harvester {get_setting('api_key')}"})
-        if mapping_request is None:
-            logger.error(f"Report Column Metadata - API Error: no response from server")
-            raise RuntimeError("API Error: no response from server")
-        if not mapping_request.ok:
-            try:
-                logger.error(f"Report Column Metadata - API responded with Error: {mapping_request.json()['error']}")
-            except BaseException:
-                logger.error(f"Report Column Metadata - API Error: {mapping_request.status_code}")
-            raise RuntimeError("API Error: server responded with error")
+        mapping_request = requests.get(
+            mapping_url,
+            headers={'Authorization': f"Harvester {settings.get_setting('api_key')}"}
+        )
+        HarvestProcessor.check_response("Get Mapping", mapping_request)
         self.mapping = mapping_request.json().get('rendered_map')
         if not isinstance(self.mapping, dict):
             if mapping_request:
@@ -330,7 +325,10 @@ class HarvestProcessor:
         Delete temporary files created during the process
         """
         if hasattr(self, 'data_file_name') and os.path.exists(self.data_file_name):
-            shutil.rmtree(self.data_file_name)
+            try:
+                shutil.rmtree(self.data_file_name)
+            except PermissionError:
+                logger.warning(f"Failed to delete {self.data_file_name}. This will have to be manually deleted.")
 
     def __del__(self):
         self._delete_temp_files()
@@ -344,8 +342,8 @@ if False:
     import shutil
     import fastnumbers
     import math
-    from src.harvester.settings import get_standard_units, get_standard_columns
-    from src.harvester.parse.maccor_input_file import MaccorInputFile
+    from src.galv_harvester.settings import get_standard_units, get_standard_columns
+    from src.galv_harvester.parse.maccor_input_file import MaccorInputFile
     os.system('cp .harvester/.harvester.json /harvester_files')
     standard_units = get_standard_units()
     standard_columns = get_standard_columns()
@@ -412,7 +410,7 @@ if False:
             if mapping['data_type'] in ["bool", "str"]:
                 df[new_name] = df[col_name].astype(mapping["data_type"])
             elif mapping['data_type'] == 'datetime64[ns]':
-                df[new_name] = pandas.to_datetime(df[col_name])
+                df[new_name] = pandas.to_datetime(df[col_name], format='ISO8601')
             else:
                 if mapping['data_type'] == 'int':
                     df[new_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)

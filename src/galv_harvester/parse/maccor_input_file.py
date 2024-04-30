@@ -15,6 +15,7 @@ from .exceptions import (
     EmptyFileError,
     InvalidDataInFileError
 )
+from ..settings import get_logger
 
 
 class MaccorInputFile(InputFile):
@@ -142,27 +143,6 @@ class MaccorInputFile(InputFile):
             metadata["last_sample_no"] = last_rec
             self.logger.debug(metadata)
             return metadata, column_info
-
-    def get_file_column_to_standard_column_mapping(self) -> dict:
-        """
-        Return a dict with a key of the column name in the file that maps to
-        the standard column name in the value. Only return values where a
-        mapping exists
-
-        """
-        self.logger.debug("get_maccor_column_to_standard_column_mapping")
-        return {
-            "Amp-hr": self.standard_columns['Charge Capacity'],
-            "Amps": self.standard_columns['Amps'],
-            "Watt-hr": self.standard_columns['Energy Capacity'],
-            "StepTime": self.standard_columns['Step Time'],
-            "Step (Sec)": self.standard_columns['Step Time'],
-            "Volts": self.standard_columns['Volts'],
-            "TestTime": self.standard_columns['Time'],
-            "Test (Sec)": self.standard_columns['Time'],
-            "Rec#": self.standard_columns['Sample Number'],
-            "Temp 1": self.standard_columns['Temperature']
-        }
 
     def load_data(self, file_path, columns):
         """
@@ -562,6 +542,7 @@ class MaccorRawInputFile(MaccorInputFile):
     """
 
     def __init__(self, file_path):
+        self.logger = get_logger(f"InputFile({file_path})")
         self.validate_file(file_path)
         super().__init__(file_path)
         self.delimiter = '\t'

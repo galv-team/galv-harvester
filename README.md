@@ -7,47 +7,34 @@
 - [Frontend](https://github.com/Battery-Intelligence-Lab/galv-frontend)
 - [**Harvester**](https://github.com/Battery-Intelligence-Lab/galv-harvester)
 
+## Installation
+
+The Galv Harvester can be installed from the [Python Package Index](https://pypi.org/project/galv-harvester/).
+
+```bash
+pip install galv-harvester
+```
+
+This will install the harvester and its dependencies, and make the `galv-harvester` command available.
+
 ## Usage
 
-This section describes how to set up the system for the first time.
-It is assumed you have already set up the [Galv server](https://github.com/Battery-Intelligence-Lab/galv-backend).
-The application has been dockerised, so can in theory be used on
-any major operating system with minimal modification.
-
-The first step is to clone the repository and navigate to the project directory:
+Run the harvester using the following command:
 
 ```bash
-git clone https://github.com/Battery-Intelligence-Lab/galv-harvester.git
-cd galv-harvester
+galv-harvester
 ```
 
-### Running with `docker-compose`
+The harvester will prompt you for the necessary settings to connect to the Galv server (see [Initial Setup](#initial-setup)).
 
-The harvester will need access to the directories you want to monitor for data files.
-This is provided by mounting the directories as volumes in the docker-compose command.
-
-```shell
-docker-compose up -v /data/directory/path:/data_dir harvester python start.py --run_foreground
-```
-
-### Running as a standalone Python program
-
-You can run the harvester as a standalone Python program.
-First, you'll need to install the required dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Next, you can launch the harvester with the following command:
-
-```bash
-python start.py --run_foreground
-```
+Alternatively, you can specify the settings as environment variables 
+(see [Using Environment Variables](#using-environment-variables))
+or as [command line arguments](#using-command-line-arguments) to the `galv-harvester` program.
 
 ## Initial Setup
 
-There are two ways to set up the harvester: using the [setup wizard](#using-the-setup-wizard), 
+There are three ways to set up the harvester: using the [setup wizard](#using-the-setup-wizard), 
+using [command line arguments](#using-command-line-arguments),
 or by specifying [environment variables](#using-environment-variables).
 You can use a combination of both methods, specifying some settings in the environment and others in the wizard.
 
@@ -82,24 +69,52 @@ Any environment variables can be omitted, and the harvester will prompt you for 
 For details on the variables you can set, and whether they are necessary, see the [variable details](#variable-details) section.
 
 ```yaml
-services:
-  harvester:
-    #...
-    environment:
-      - GALV_HARVESTER_RESTART=1
-      - GALV_HARVESTER_SERVER_URL=<your_server_url>
-      - GALV_HARVESTER_NAME=<your_harvester_name>
-      - GALV_HARVESTER_API_TOKEN=<your_api_token>
-      - GALV_HARVESTER_LAB_ID=<your_lab_id>
-      - GALV_HARVESTER_TEAM_ID=<your_team_id>
-      - GALV_HARVESTER_MONITOR_PATH=<your_monitor_path>
-      - GALV_HARVESTER_MONITOR_PATH_REGEX=<your_monitor_path_regex>
-      - GALV_HARVESTER_SKIP_WIZARD=<true_or_omit>
-      - GALV_HARVESTER_RUN_FOREGROUND=<true_or_omit>
+# .env
+GALV_HARVESTER_RESTART=1
+GALV_HARVESTER_SERVER_URL=<your_server_url>
+GALV_HARVESTER_NAME=<your_harvester_name>
+GALV_HARVESTER_API_TOKEN=<your_api_token>
+GALV_HARVESTER_LAB_ID=<your_lab_id>
+GALV_HARVESTER_TEAM_ID=<your_team_id>
+GALV_HARVESTER_MONITOR_PATH=<your_monitor_path>
+GALV_HARVESTER_MONITOR_PATH_REGEX=<your_monitor_path_regex>
+GALV_HARVESTER_SKIP_WIZARD=<true_or_omit>
+GALV_HARVESTER_RUN_FOREGROUND=<true_or_omit>
 ```
 
 If you don't want to have to specify the path to the data directory every time you start the harvester,
 you can also edit the `docker-compose.yml` file to include the path as a volume.
+
+### Using command line arguments
+
+You can also specify harvester properties as command line arguments:
+
+```text
+Usage: galv-harvester [OPTIONS]
+
+Options:
+  --version                  Show the version and exit.
+  --url TEXT                 API URL to register harvester with.
+  --name TEXT                Name for the harvester.
+  --api_token TEXT           Your API token. You must have admin access to at
+                             least one Lab.
+  --lab_id INTEGER           Id of the Lab to assign the Harvester to. Only
+                             required if you administrate multiple Labs.
+  --team_id INTEGER          Id of the Team to create a Monitored Path for.
+                             Only required if you administrate multiple Teams
+                             and wish to create a monitored path.
+  --monitor_path TEXT        Path to harvest files from.
+  --monitor_path_regex TEXT  Regex to match files to harvest. Other options
+                             can be specified using the frontend.
+  --run_foreground           On completion, run the harvester in the
+                             foreground (will not close the thread, useful for
+                             Dockerized application).
+  --restart                  Ignore other options and run harvester if config
+                             file already exists.
+  --help                     Show this message and exit.
+```
+
+For details on the variables you can set, and when they are necessary, see the [variable details](#variable-details) section.
 
 ## Variable details
 
@@ -138,7 +153,7 @@ Monitored Paths can only be created and edited by Team administrators, as a secu
 If you need to restart the harvester, you can do so by running the following command:
 
 ```bash
-docker-compose up -v /data/directory/path:/data_dir harvester python start.py --restart
+galv-harvester --restart
 ```
 
 This will restart the harvester using the previously-configured settings.

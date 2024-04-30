@@ -7,9 +7,16 @@ import re
 import time
 import traceback
 
-from src.harvester import settings
-from src.harvester.parse.exceptions import UnsupportedFileTypeError
-from .settings import get_logger, get_setting
+from .parse.exceptions import UnsupportedFileTypeError
+from .settings import (
+    get_logger,
+    get_setting,
+    HARVESTER_TASK_FILE_SIZE,
+    HARVESTER_TASK_IMPORT,
+    HARVEST_STAGE_COMPLETE,
+    HARVESTER_TASK_IMPORT,
+    HARVEST_STAGE_FAILED
+)
 from .api import report_harvest_result, update_config
 from .harvest import HarvestProcessor
 
@@ -67,7 +74,7 @@ def harvest_path(monitored_path: dict):
                         path=full_path,
                         monitored_path_id=monitored_path.get('id'),
                         content={
-                            'task': settings.HARVESTER_TASK_FILE_SIZE,
+                            'task': HARVESTER_TASK_FILE_SIZE,
                             'size': os.stat(full_path).st_size
                         }
                     )
@@ -83,8 +90,8 @@ def harvest_path(monitored_path: dict):
                                     path=full_path,
                                     monitored_path_id=monitored_path.get('id'),
                                     content={
-                                        'task': settings.HARVESTER_TASK_IMPORT,
-                                        'stage': settings.HARVEST_STAGE_COMPLETE
+                                        'task': HARVESTER_TASK_IMPORT,
+                                        'stage': HARVEST_STAGE_COMPLETE
                                     }
                                 )
                                 logger.info(f"Successfully parsed file {file_path}")
@@ -96,8 +103,8 @@ def harvest_path(monitored_path: dict):
                                     path=full_path,
                                     monitored_path_id=monitored_path.get('id'),
                                     content={
-                                        'task': settings.HARVESTER_TASK_IMPORT,
-                                        'stage': settings.HARVEST_STAGE_FAILED,
+                                        'task': HARVESTER_TASK_IMPORT,
+                                        'stage': HARVEST_STAGE_FAILED,
                                         'error': f"Error in Harvester. {e.__class__.__name__}: {e}. [See harvester logs for more details]"
                                     }
                                 )

@@ -8,8 +8,6 @@ import pathlib
 import logging
 import logging.handlers
 
-VERSION = '0.1.0'
-
 logging.basicConfig(
     format='%(asctime)s %(levelname)s %(message)s [%(name)s:%(lineno)d]',
     level=logging.INFO,

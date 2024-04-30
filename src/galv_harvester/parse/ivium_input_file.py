@@ -25,19 +25,6 @@ class IviumInputFile(InputFile):
         super().__init__(file_path, **kwargs)
         self.logger.info("Type is IVIUM")
 
-    def get_file_column_to_standard_column_mapping(self) -> dict:
-        """
-            Return a dict with a key of the column name in the file that maps to
-            the standard column name in the value. Only return values where a
-            mapping exists
-        """
-        self.logger.debug("get_ivium_column_to_standard_column_mapping")
-        return {
-            "amps": self.standard_columns['Amps'],
-            "volts": self.standard_columns['Volts'],
-            "test_time": self.standard_columns['Time']
-        }
-
     def load_data(self, file_path, columns):
         """
             Load data in a ivium text file"

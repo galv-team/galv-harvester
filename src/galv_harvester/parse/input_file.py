@@ -4,7 +4,7 @@
 
 from .exceptions import UnsupportedFileTypeError
 import traceback
-from src.harvester.settings import get_logger
+from ..settings import get_logger
 
 # see https://gist.github.com/jsheedy/ed81cdf18190183b3b7d
 # https://stackoverflow.com/a/30721460
@@ -19,11 +19,10 @@ class InputFile:
         'mA.h': 1e-3
     }
 
-    def __init__(self, file_path, standard_columns: dict, standard_units: dict):
+    def __init__(self, file_path):
         self.file_path = file_path
-        self.standard_columns = standard_columns
-        self.standard_units = standard_units
-        self.logger = get_logger(f"InputFile({self.file_path})")
+        if not hasattr(self, 'logger'):
+            self.logger = get_logger(f"InputFile({self.file_path})")
         self.metadata, self.column_info = self.load_metadata()
 
     def get_columns(self):
@@ -142,7 +141,10 @@ class InputFile:
         """
             returns map of file column name strings to column id numbers
         """
-        raise UnsupportedFileTypeError()
+        raise DeprecationWarning(
+            "This method is deprecated. "
+            "Use existing column names and rely on a Galv server mapping to standardize columns."
+        )
 
     def load_metadata(self):
         """

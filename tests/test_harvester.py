@@ -2,18 +2,19 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 import json
+import tempfile
 import unittest
 from unittest.mock import patch
 import os
 from pathlib import Path
 
-import harvester.run
-import harvester.harvest
-from harvester import settings
+import galv_harvester.run
+import galv_harvester.harvest
+from galv_harvester import settings
 
 
 def get_test_file_path():
-    return os.getenv('TEST_DIR', "/usr/test_data")
+    return os.getenv('GALV_HARVESTER_TEST_PATH', os.path.abspath(".test-data/test-suite-small"))
 
 class ConfigResponse:
     status_code = 200
@@ -165,11 +166,11 @@ def fail(e, *kwargs):
 
 class TestHarvester(unittest.TestCase):
     @patch('requests.get')
-    @patch('harvester.api.logger')
-    @patch('harvester.run.logger')
-    @patch('harvester.api.get_settings_file')
-    @patch('harvester.settings.get_settings_file')
-    @patch('harvester.settings.get_logfile')
+    @patch('galv_harvester.api.logger')
+    @patch('galv_harvester.run.logger')
+    @patch('galv_harvester.api.get_settings_file')
+    @patch('galv_harvester.settings.get_settings_file')
+    @patch('galv_harvester.settings.get_logfile')
     def test_config_update(
             self,
             mock_settings_log,
@@ -179,22 +180,24 @@ class TestHarvester(unittest.TestCase):
             mock_api_logger,
             mock_get
     ):
-        mock_settings_log.return_value = '/tmp/harvester.log'
-        mock_settings_file.return_value = '/tmp/harvester.json'
-        mock_api_settings_file.return_value = '/tmp/harvester.json'
-        mock_api_logger.error = fail
-        mock_run_logger.error = fail
-        mock_get.return_value = ConfigResponse()
-        harvester.run.update_config()
-        if not os.path.isfile(mock_settings_file()):
-            raise AssertionError(f"Expected JSON file '{mock_settings_file()}' not found")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            mock_settings_log.return_value = os.path.join(tmp_dir, 'harvester.log')
+            mock_settings_file.return_value = os.path.join(tmp_dir, 'harvester.json')
+            mock_api_settings_file.return_value = os.path.join(tmp_dir, 'harvester.json')
+            mock_api_logger.error = fail
+            mock_run_logger.error = fail
+            mock_get.return_value = ConfigResponse()
+            galv_harvester.run.update_config()
+            if not os.path.isfile(mock_settings_file()):
+                raise AssertionError(f"Expected JSON file '{mock_settings_file()}' not found")
 
-        os.remove(mock_settings_file())
+            os.remove(mock_settings_file())
 
-    @patch('harvester.run.report_harvest_result')
-    @patch('harvester.run.HarvestProcessor', autospec=True)
-    @patch('harvester.run.logger')
-    @patch('harvester.settings.get_settings')
+
+    @patch('galv_harvester.run.report_harvest_result')
+    @patch('galv_harvester.run.HarvestProcessor', autospec=True)
+    @patch('galv_harvester.run.logger')
+    @patch('galv_harvester.settings.get_settings')
     def test_harvest_path(self, mock_settings, mock_logger, mock_processor, mock_report):
         mock_settings.return_value = ConfigResponse().json()
         # Create an unparsable file in the test set
@@ -202,7 +205,7 @@ class TestHarvester(unittest.TestCase):
         Path(os.path.join(get_test_file_path(), 'skipped_by_regex.skip')).touch(exist_ok=True)
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(200, {'state': 'STABLE'})
-        harvester.run.harvest_path(ConfigResponse().json()['monitored_paths'][0])
+        galv_harvester.run.harvest_path(ConfigResponse().json()['monitored_paths'][0])
         files = []
         expected_file_count = 9
         for c in mock_processor.call_args_list:
@@ -225,9 +228,9 @@ class TestHarvester(unittest.TestCase):
 
     @patch('requests.post')
     @patch('requests.get')
-    @patch('harvester.harvest.report_harvest_result')
-    @patch('harvester.harvest.logger')
-    @patch('harvester.settings.get_settings')
+    @patch('galv_harvester.harvest.report_harvest_result')
+    @patch('galv_harvester.harvest.logger')
+    @patch('galv_harvester.settings.get_settings')
     def import_file(self, filename, mock_settings, mock_logger, mock_report, mock_get, mock_post, additional_checks=None):
         mock_settings.return_value = ConfigResponse().json()
         mock_logger.error = fail
@@ -241,7 +244,7 @@ class TestHarvester(unittest.TestCase):
         )
         mock_get.return_value = JSONResponse(200, {'rendered_map': {}})
         mock_post.return_value = JSONResponse(204, {})
-        harvester.harvest.HarvestProcessor(
+        galv_harvester.harvest.HarvestProcessor(
                 os.path.join(get_test_file_path(), filename), ConfigResponse().json()["monitored_paths"][0]
         ).harvest()
         self.validate_report_calls(mock_report.call_args_list)
