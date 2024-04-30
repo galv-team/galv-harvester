@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
-from __future__ import annotations
 
-import os
 import json
 
 from . import settings
@@ -16,7 +14,7 @@ logger = get_logger(__file__)
 
 
 def report_harvest_result(
-        path: os.PathLike|str,
+        path,
         monitored_path_id: str,
         content=None,
         error: BaseException = None,
