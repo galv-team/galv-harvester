@@ -1,4 +1,4 @@
-name: CI Tests
+name: Test, Build, and Publish
 on:
   push:
   workflow_dispatch:
