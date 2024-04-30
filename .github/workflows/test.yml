@@ -39,7 +39,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
-          key: liionsden-test-suite
+          key: liionsden-test-suite-small-v1
 
       - name: Download test suite
         if: steps.cache-restore.outputs.cache-hit != 'true'
