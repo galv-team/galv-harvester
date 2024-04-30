@@ -60,6 +60,9 @@ jobs:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
+      - name: Set permissons
+        run: sudo chown -R $USER .
+
       # Setup the appropriate Python version, hatch, and the dependencies
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
