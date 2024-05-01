@@ -23,3 +23,6 @@ docs/build/
 *.pptx
 
 .coverage.*
+test.tmp.parquet/
+
+dist/

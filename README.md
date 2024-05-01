@@ -2,7 +2,7 @@
 > A metadata secretary for battery science
 
 [![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
-[![Test, Build, and Publish](https://github.com/Battery-Intelligence-Lab/galv-harvester/actions/workflows/test.yml/badge.svg)](https://github.com/Battery-Intelligence-Lab/galv-harvester/actions/workflows/test.yml)
+[![Test](https://github.com/Battery-Intelligence-Lab/galv-harvester/actions/workflows/test.yml/badge.svg)](https://github.com/Battery-Intelligence-Lab/galv-harvester/actions/workflows/test.yml)
 
 ## Galv Project
 - [Specification](https://github.com/Battery-Intelligence-Lab/galv-spec)
