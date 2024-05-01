@@ -7,7 +7,7 @@ name = "galv-harvester"
 dynamic = ["version"]
 description = ''
 readme = "README.md"
-license = { file = "LICENCE" }
+license = { file = "LICENSE" }
 requires-python = ">=3.9"
 authors = [
     { name = "Matt Jaquiery", email = "matt.jaquiery@dtc.ox.ac.uk" },
