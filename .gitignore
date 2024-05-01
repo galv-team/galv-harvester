@@ -24,3 +24,5 @@ docs/build/
 
 .coverage.*
 test.tmp.parquet/
+
+dist/
