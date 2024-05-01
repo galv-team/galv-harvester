@@ -1,0 +1,93 @@
+name: Test
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+    dry_run:
+      type: boolean
+      description: 'Do not actually release the package, just check that it is valid.'
+      required: false
+      default: false
+
+jobs:
+  run-tests:
+    uses: ./.github/workflows/test.yml
+    with:
+      debug_enabled: ${{ github.event.inputs.debug_enabled }}
+    secrets: inherit
+
+  check-tag:
+    needs:
+      - run-tests
+    runs-on: ubuntu-latest
+    outputs:
+      tag-matches-version: ${{ steps.check-tag.outputs.tag-matches-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches version
+        id: check-tag
+        run: |
+          # Check if the tag matches the version or the version with a 'v' prefix
+          tag = "$(git tag --points-at HEAD)"
+          hatch_version = "$(hatch version)"
+          match = "$tag" == "v$hatch_version" 
+          match = match || "$tag" == "$hatch_version"
+          # Check if the tag is not empty and not 'v'
+          match = match && "$tag" != "" && "$tag" != "v"
+          # Also check there aren't two 'v's at the start of the tag
+          match = match && "$tag" != "vv*"
+          echo "tag-matches-version=$match" >> $GITHUB_OUTPUT
+
+  publish-pypi:
+    runs-on: ubuntu-latest
+    needs:
+      - check-tag
+    if: github.event.inputs.dry-run != 'true' && needs.check-tag.outputs.tag-matches-version == 'true'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/galv-harvester
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dist
+        run: hatch run build
+
+      - name: Publish 🐍 📦 to PyPI
+        # run if not dry-run AND we're pushing to a tag
+        if: github.event.inputs.dry-run != 'true' && steps.check-tag.outputs.tag-matches-version == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-testpypi:
+    runs-on: ubuntu-latest
+    needs:
+      - check-tag
+    if: github.event.inputs.dry-run == 'true' || needs.check-tag.outputs.tag-matches-version != 'true'
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/galv-harvester
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dist
+        run: hatch run build
+
+      - name: Publish 🐍 📦 to TestPyPI (dry-run)
+        if: github.event.inputs.dry-run == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish 🐍 📦 to TestPyPI (tag mismatch)
+        if: github.event.inputs.dry-run != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
