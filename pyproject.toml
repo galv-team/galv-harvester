@@ -48,6 +48,16 @@ Source = "https://github.com/unknown/galv-harvester"
 [project.scripts]
 galv-harvester = "galv_harvester.start:click_wrapper"
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.github",
+    "/docs",
+    "/.harvester",
+    "/.schema",
+    "/.venv",
+    "/.vscode"
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/galv_harvester"]
 
