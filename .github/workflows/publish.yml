@@ -18,7 +18,7 @@ jobs:
   run-tests:
     uses: ./.github/workflows/test.yml
     with:
-      debug_enabled: ${{ github.event.inputs.debug_enabled }}
+      debug_enabled: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
     secrets: inherit
 
   check-tag:
