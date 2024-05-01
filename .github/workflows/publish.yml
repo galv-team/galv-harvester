@@ -76,7 +76,6 @@ jobs:
 
       - name: Publish 🐍 📦 to PyPI
         # run if not dry-run AND we're pushing to a tag
-        if: github.event.inputs.dry-run != 'true' && steps.check-tag.outputs.tag-matches-version == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
 
   publish-testpypi:
