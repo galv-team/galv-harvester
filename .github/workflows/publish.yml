@@ -67,8 +67,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install hatch
+        run: |
+          python -m pip install hatch
+
       - name: Build dist
-        run: hatch run build
+        run: hatch build
 
       - name: Publish 🐍 📦 to PyPI
         # run if not dry-run AND we're pushing to a tag
@@ -88,8 +92,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install hatch
+        run: |
+          python -m pip install hatch
+
       - name: Build dist
-        run: hatch run build
+        run: hatch build
 
       - name: Publish 🐍 📦 to TestPyPI (dry-run)
         if: github.event.inputs.dry-run == 'true'
