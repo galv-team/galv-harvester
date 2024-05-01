@@ -104,9 +104,11 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
 
       - name: Publish 🐍 📦 to TestPyPI (${{ steps.check-tag.outputs.fail-reason }})
         if: github.event.inputs.dry-run != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
