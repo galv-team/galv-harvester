@@ -39,6 +39,7 @@ dependencies = [
     "xlrd~=2.0.1",
     "psutil~=5.9.4",
     "holoviews~=1.18.3",
+    "datashader~=0.16.1",
 ]
 
 [project.urls]
