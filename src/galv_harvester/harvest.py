@@ -365,7 +365,10 @@ class HarvestProcessor:
                 },
                 files=files
             )
-            HarvestProcessor.check_response("Upload PNG", report)
+            try:
+                HarvestProcessor.check_response("Upload PNG", report)
+            except BaseException as e:
+                logger.warning(f"Failed to upload PNG: {e}")
 
     def _delete_temp_files(self):
         """
