@@ -4,6 +4,7 @@ pandas==2.2.1
 dask[complete]==2024.4.2
 fastnumbers==5.1.0
 holoviews==1.18.3
+datashader==0.16.1
 
 # Filetype readers
 galvani == 0.4.1

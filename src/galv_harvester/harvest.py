@@ -398,8 +398,6 @@ if False:
     import shutil
     import fastnumbers
     import math
-    import datashader
-    from datashader import transfer_functions, mpl_ext
     import holoviews as hv
     import holoviews.operation.datashader as hd
 
