@@ -16,7 +16,7 @@ logging.basicConfig(
 
 
 def get_logfile() -> pathlib.Path:
-    return pathlib.Path(os.getenv('GALV_HARVESTER_LOG_FILE', "/harvester_files/harvester.log"))
+    return pathlib.Path(os.getenv('GALV_HARVESTER_LOG_FILE', "./.harvester/harvester.log"))
 
 
 def get_logger(name):
@@ -37,7 +37,7 @@ logger = get_logger(__file__)
 
 
 def get_settings_file() -> pathlib.Path:
-    return pathlib.Path(os.getenv('GALV_HARVESTER_SETTINGS_FILE', "/harvester_files/.harvester.json"))
+    return pathlib.Path(os.getenv('GALV_HARVESTER_SETTINGS_FILE', "./.harvester/settings.json"))
 
 
 def get_settings():
@@ -96,5 +96,6 @@ HARVEST_STAGE_FILE_METADATA = 'file metadata'
 HARVEST_STAGE_DATA_SUMMARY = 'data summary'
 HARVEST_STAGE_UPLOAD_PARQUET = 'upload parquet partitions'
 HARVEST_STAGE_UPLOAD_COMPLETE = 'upload complete'
+HARVEST_STAGE_UPLOAD_PNG = 'upload png'
 HARVEST_STAGE_COMPLETE = 'harvest complete'
 HARVEST_STAGE_FAILED = 'harvest failed'

@@ -54,7 +54,7 @@ def get_url() -> str:
     return append_slash(url)
 
 def create_monitored_path(
-        api_url, api_token, harvester_uuid, specified,
+        api_url, api_token, harvester_id, specified,
         team_id, monitor_path, monitor_path_regex
 ) -> None:
     # TODO: Ensure that the team is a member of the harvester's lab
@@ -169,7 +169,7 @@ def create_monitored_path(
                 {
                     'path': monitor_path,
                     'regex': monitor_path_regex,
-                    'harvester': harvester_uuid,
+                    'harvester': harvester_id,
                     'team': team['id'],
                     'active': True
                 },
@@ -300,7 +300,11 @@ def register(
     if name is None:
         name = get_name()
     while True:
-        result = query(f"{url}harvesters/?name={name}&lab_id={lab_id}")
+        if name == "":
+            click.echo("Name cannot be blank.")
+            name = get_name()
+            continue
+        result = query(f"{url}harvesters/?name={name}&lab__id={lab_id}")
 
         if result['count'] > 0:
             click.echo(f"This Lab already has a harvester called {name}.", err=True)
@@ -332,7 +336,7 @@ def register(
 
     if monitor_path is not None or not specified:
         create_monitored_path(
-            api_url=url, api_token=api_token, harvester_uuid=result['uuid'], specified=specified,
+            api_url=url, api_token=api_token, harvester_id=result['id'], specified=specified,
             team_id=team_id, monitor_path=monitor_path, monitor_path_regex=monitor_path_regex
         )
 
@@ -346,7 +350,7 @@ def register(
     if run_foreground:
         run.run_cycle()
     else:
-        subprocess.Popen(["python", "-m", "run"])
+        subprocess.Popen(["python", "-m", "galv_harvester.run"])
         click.echo(f"Complete. Harvester is running and logging to {settings.get_logfile()}")
 
 

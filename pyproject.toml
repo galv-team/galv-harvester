@@ -38,6 +38,7 @@ dependencies = [
     "maya~=0.6.1",
     "xlrd~=2.0.1",
     "psutil~=5.9.4",
+    "holoviews~=1.18.3",
 ]
 
 [project.urls]

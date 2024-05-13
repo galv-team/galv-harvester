@@ -34,7 +34,7 @@ The mapping object is a dictionary with the following structure:
 ```
 Columns will be coerced to the specified data type. 
 Coercion is done using the `pd.Series.asdtype()` function, except for datetime64[ns] columns, 
-which are coerced using `pd.to_datetime(x, format='ISO8601')`.
+which are coerced using `pd.to_datetime(x)`.
 
 Numerical (int/float) columns will be rebased and rescaled according to the `multiplier` and `addition` fields.
 New column values = (old column values + `addition`) * `multiplier`.

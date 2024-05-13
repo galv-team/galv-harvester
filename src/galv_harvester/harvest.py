@@ -13,6 +13,8 @@ import math
 import os
 import shutil
 import requests
+import holoviews as hv
+import holoviews.operation.datashader as hd
 
 from . import settings
 from .parse.exceptions import UnsupportedFileTypeError
@@ -199,7 +201,7 @@ class HarvestProcessor:
                 if mapping['data_type'] in ["bool", "str"]:
                     df[col_name] = df[col_name].astype(mapping["data_type"])
                 elif mapping['data_type'] == 'datetime64[ns]':
-                    df[col_name] = pandas.to_datetime(df[col_name], format='ISO8601')
+                    df[col_name] = pandas.to_datetime(df[col_name])
                 else:
                     if mapping['data_type'] == 'int':
                         df[col_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
@@ -243,6 +245,9 @@ class HarvestProcessor:
             partition_generator(reader, partition_line_count=partition_line_count)
         )
 
+        # Create a plot of key data columns for identification purposes
+        self._plot_png(data)
+
         # Save the data as parquet
         self.data_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet")
         data.to_parquet(
@@ -255,6 +260,27 @@ class HarvestProcessor:
         )
         self.row_count = data.shape[0].compute()
         self.partition_count = data.npartitions
+
+    def _plot_png(self, data):
+        """
+        Create a plot of key data columns for identification purposes
+        """
+        try:
+            self.png_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.png")
+            hd.shade.cmap = ["lightblue", "darkblue"]
+            hv.extension("matplotlib")
+            hv.output(fig='png', backend="matplotlib")
+            dataset = hv.Dataset(data, 'ElapsedTime_s', ['Voltage_V', 'Current_A'])
+            layout = (
+                    dataset.to(hv.Curve, 'ElapsedTime_s', 'Voltage_V') +
+                    dataset.to(hv.Curve, 'ElapsedTime_s', 'Current_A')
+            )
+            layout.opts(hv.opts.Curve(framewise=True, aspect=4, sublabel_format=''))
+            hv.save(layout, self.png_file_name, fmt='png')
+            self.png_ok = True
+        except Exception as e:
+            logger.warning(f"Failed to create plot: {e}")
+            self.png_ok = False
 
     def _upload_data(self):
         """
@@ -276,6 +302,7 @@ class HarvestProcessor:
                 # send data in a flat format to accompany file upload protocol.
                 # Kinda hacky because it overwrites much of report_harvest_result's functionality
                 data={
+                    'format': 'flat',
                     'status': settings.HARVESTER_STATUS_SUCCESS,
                     'path': self.file_path,
                     'monitored_path_id': self.monitored_path.get('id'),
@@ -320,15 +347,41 @@ class HarvestProcessor:
             }
         )
 
+        if self.png_ok:
+            files = {'png_file': (os.path.basename(self.png_file_name), open(self.png_file_name, 'rb'))}
+            report = report_harvest_result(
+                path=self.file_path,
+                monitored_path_id=self.monitored_path.get('id'),
+                # send data in a flat format to accompany file upload protocol.
+                # Kinda hacky because it overwrites much of report_harvest_result's functionality
+                data={
+                    'format': 'flat',
+                    'status': settings.HARVESTER_STATUS_SUCCESS,
+                    'path': self.file_path,
+                    'monitored_path_id': self.monitored_path.get('id'),
+                    'task': settings.HARVESTER_TASK_IMPORT,
+                    'stage': settings.HARVEST_STAGE_UPLOAD_PNG,
+                    'filename': os.path.basename(self.png_file_name)
+                },
+                files=files
+            )
+            HarvestProcessor.check_response("Upload PNG", report)
+
     def _delete_temp_files(self):
         """
         Delete temporary files created during the process
         """
-        if hasattr(self, 'data_file_name') and os.path.exists(self.data_file_name):
-            try:
-                shutil.rmtree(self.data_file_name)
-            except PermissionError:
-                logger.warning(f"Failed to delete {self.data_file_name}. This will have to be manually deleted.")
+        for attribute in ['data_file_name', 'png_file_name']:
+            if hasattr(self, attribute):
+                filename = getattr(self, attribute)
+                if os.path.exists(filename):
+                    try:
+                        if os.path.isdir(filename):
+                            shutil.rmtree(filename)
+                        else:
+                            os.remove(filename)
+                    except PermissionError:
+                        logger.warning(f"Failed to delete {filename}. This will have to be manually deleted.")
 
     def __del__(self):
         self._delete_temp_files()
@@ -342,13 +395,14 @@ if False:
     import shutil
     import fastnumbers
     import math
-    from src.galv_harvester.settings import get_standard_units, get_standard_columns
+    import datashader
+    from datashader import transfer_functions, mpl_ext
+    import holoviews as hv
+    import holoviews.operation.datashader as hd
+
     from src.galv_harvester.parse.maccor_input_file import MaccorInputFile
-    os.system('cp .harvester/.harvester.json /harvester_files')
-    standard_units = get_standard_units()
-    standard_columns = get_standard_columns()
     file_path = '.test-data/test-suite-small/TPG1+-+Cell+15+-+002.txt'
-    input_file = MaccorInputFile(file_path, standard_units=standard_units, standard_columns=standard_columns)
+    input_file = MaccorInputFile(file_path)
 
     mapping = {
         "Amps": {
@@ -358,13 +412,13 @@ if False:
             "addition": 0
         },
         "Rec#": {
-            "new_name": "Sample_number",
+            "new_name": "SampleNumber",
             "data_type": "int",
             "multiplier": 1,
             "addition": 0
         },
         "Step": {
-            "new_name": "Step_number",
+            "new_name": "StepNumber",
             "data_type": "int",
             "multiplier": 1,
             "addition": 0
@@ -396,7 +450,7 @@ if False:
             "addition": 0
         },
         "TestTime": {
-            "new_name": "Elapsed_time_s",
+            "new_name": "ElapsedTime_s",
             "data_type": "float",
             "multiplier": 1,
             "addition": 0
@@ -410,7 +464,7 @@ if False:
             if mapping['data_type'] in ["bool", "str"]:
                 df[new_name] = df[col_name].astype(mapping["data_type"])
             elif mapping['data_type'] == 'datetime64[ns]':
-                df[new_name] = pandas.to_datetime(df[col_name], format='ISO8601')
+                df[new_name] = pandas.to_datetime(df[col_name])
             else:
                 if mapping['data_type'] == 'int':
                     df[new_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
@@ -442,7 +496,7 @@ if False:
                 stopping = True
             yield to_df(rows)
 
-    partition_line_count = 10_000
+    partition_line_count = 100_000
 
     reader = input_file.load_data(
         file_path,
@@ -456,6 +510,19 @@ if False:
 
     data.compute()
     print(f"Rows: {data.shape[0].compute()}")
+
+    # Create a plot of key data columns for identification purposes
+    hd.shade.cmap = ["lightblue", "darkblue"]
+    hv.extension("matplotlib")
+    hv.output(fig='png', backend="matplotlib")
+    dataset = hv.Dataset(data, 'ElapsedTime_s', ['Voltage_V', 'Current_A'])
+    layout = (
+            dataset.to(hv.Curve, 'ElapsedTime_s', 'Voltage_V') +
+            dataset.to(hv.Curve, 'ElapsedTime_s', 'Current_A')
+    )
+    layout.opts(hv.opts.Curve(framewise=True, aspect=4, sublabel_format=''))
+    hv.save(layout, 'test.tmp.hv.png', fmt='png')
+
     # Then we would upload the data by getting presigned URLs for each partition
     shutil.rmtree("test.tmp.parquet")
     print('done')
