@@ -7,7 +7,6 @@
 [![Test, Build, and Publish](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml/badge.svg)](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml)
 
 ## Galv Project
-- [Specification](https://github.com/galv-team/galv-spec)
 - [Backend](https://github.com/galv-team/galv-backend)
 - [Frontend](https://github.com/galv-team/galv-frontend)
 - [**Harvester**](https://github.com/galv-team/galv-harvester)
