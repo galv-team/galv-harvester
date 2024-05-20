@@ -2,13 +2,13 @@
 > A metadata secretary for battery science
 
 [![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
-[![Test, Build, and Publish](https://github.com/Battery-Intelligence-Lab/galv-harvester/actions/workflows/publish.yml/badge.svg)](https://github.com/Battery-Intelligence-Lab/galv-harvester/actions/workflows/publish.yml)
+[![Test, Build, and Publish](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml/badge.svg)](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml)
 
 ## Galv Project
-- [Specification](https://github.com/Battery-Intelligence-Lab/galv-spec)
-- [Backend](https://github.com/Battery-Intelligence-Lab/galv-backend)
-- [Frontend](https://github.com/Battery-Intelligence-Lab/galv-frontend)
-- [**Harvester**](https://github.com/Battery-Intelligence-Lab/galv-harvester)
+- [Specification](https://github.com/galv-team/galv-spec)
+- [Backend](https://github.com/galv-team/galv-backend)
+- [Frontend](https://github.com/galv-team/galv-frontend)
+- [**Harvester**](https://github.com/galv-team/galv-harvester)
 
 ## Installation
 
@@ -45,7 +45,7 @@ If you launch the program using the commands above, you will be prompted to ente
 
 ### Using the setup wizard
 
-First, you'll be asked for the [Galv server](https://github.com/Battery-Intelligence-Lab/galv-backend) URL.
+First, you'll be asked for the [Galv server](https://github.com/galv-team/galv-backend) URL.
 This should be the URL of the Galv server you have set up.
 Providing a frontend URL will not work, as the harvester needs to communicate with the backend.
 

@@ -2,7 +2,7 @@
 
 ## Harvest process
 
-Harvesters communicate with a [Galv server](https://github.com/Battery-Intelligence-Lab/galv-backend) to upload data files.
+Harvesters communicate with a [Galv server](https://github.com/galv-team/galv-backend) to upload data files.
 The Harvester runs on a simple loop.
 **Calls to the server are in bold.** *Server responses are in italics.*:
 1. Check for settings updates, including new Monitored Paths
