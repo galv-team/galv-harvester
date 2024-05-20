@@ -1,6 +1,8 @@
 # Galv Harvester (Python program)
 > A metadata secretary for battery science
 
+[![PyPI - Version](https://img.shields.io/pypi/v/galv-harvester)](https://pypi.org/project/galv-harvester/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/galv-harvester)](https://pypi.org/project/galv-harvester/)
 [![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
 [![Test, Build, and Publish](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml/badge.svg)](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml)
 
