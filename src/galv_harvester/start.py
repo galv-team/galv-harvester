@@ -12,6 +12,7 @@ import requests
 
 from . import run, settings
 
+
 def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs):
     while retries > 0:
         try:
@@ -51,6 +52,7 @@ def get_url() -> str:
     click.echo("Enter the URL for the Galv server you wish to connect to.")
     url = input("API URL: ")
     return append_slash(url)
+
 
 def create_monitored_path(
         api_url, api_token, harvester_id, specified,
@@ -358,9 +360,19 @@ def click_wrapper():
     pass
 
 
-@click_wrapper.command()
-@click.option('--path', type=str, help="File/Directory to harvest files from. If left blank, all Monitored Paths in the config will be harvested.")
-def harvest(path: str):
+@click_wrapper.command(
+    help="""
+PATHS: Files/Directories to harvest files from. If left blank, all Monitored Paths in the config will be harvested.
+""",
+    short_help="Run the harvester manually."
+)
+@click.argument(
+    'paths',
+    type=str,
+    nargs=-1,
+    required=False
+)
+def harvest(paths):
     # Check we can access settings
     try:
         current_settings = settings.get_settings()
@@ -368,67 +380,95 @@ def harvest(path: str):
         click.echo("No settings file found. Please run `galv-harvester setup` wizard.")
         exit(1)
 
-    if path:
-        path = os.path.abspath(path)
-        # Check the path is valid
-        if not os.path.exists(path):
-            click.echo(f"Path {path} does not exist on the filesystem.")
-            exit(1)
-        # Check the path is on a monitored path
-        monitored_paths = current_settings.get('monitored_paths', [])
-        monitored_path = None
-        for mp in monitored_paths:
-            # A match is where the path is a substring of the monitored path
-            if not path.lower().startswith(mp['path'].lower()):
-                continue
-            # and the regex matches (for files)
-            if os.path.isfile(path):
-                if re.match(mp['regex'], os.path.relpath(path, mp['path'])):
+    if paths is not None and len(paths) > 0:
+        printed_paths = False
+        for path in paths:
+            path = os.path.abspath(path)
+            # Check the path is valid
+            if not os.path.exists(path):
+                click.echo(f"Path {path} does not exist on the filesystem.")
+                exit(1)
+            # Check the path is on a monitored path
+            monitored_paths = current_settings.get('monitored_paths', [])
+            monitored_path = None
+            for mp in monitored_paths:
+                # A match is where the path is a substring of the monitored path
+                if not path.lower().startswith(mp['path'].lower()):
+                    continue
+                # and the regex matches (for files)
+                if os.path.isfile(path):
+                    if re.match(mp['regex'], os.path.relpath(path, mp['path'])):
+                        monitored_path = mp
+                        break
+                elif os.path.isdir(path):
                     monitored_path = mp
                     break
-            elif os.path.isdir(path):
-                monitored_path = mp
-                break
-        if not monitored_path:
-            click.echo(f"Could not find {path} in any monitored paths.")
-            click.echo(f"Available monitored paths [path : regex] are:")
-            for mp in monitored_paths:
-                click.echo(f"{mp['path']} : {mp['regex']}")
-            exit(1)
+            if not monitored_path:
+                click.echo(f"Could not find {path} in any monitored paths.")
+                if not printed_paths:
+                    click.echo(f"Available monitored paths [path : regex] are:")
+                    for mp in monitored_paths:
+                        click.echo(f"{mp['path']} : {mp['regex']}")
+                    printed_paths = True
 
-        # Harvest the path
-        if os.path.isfile(path):
-            run.harvest_file(path, monitored_path)
-        else:
-            run.harvest_path(monitored_path)
+            # Harvest the path
+            if os.path.isfile(path):
+                run.harvest_file(path, monitored_path)
+            else:
+                run.harvest_path(monitored_path)
         return
 
     # Run the harvester for a single cycle
     run.harvest()
 
 
-@click_wrapper.command()
-def restart():
-    click.echo("Attempting to restart harvester.")
+@click_wrapper.command(
+    short_help="Start the harvester using existing config settings."
+)
+@click.option(
+    '--run_foreground',
+    is_flag=True,
+    help=(
+            "On completion, run the harvester in the foreground "
+            "(will not close the thread, useful for Dockerized application)."
+    )
+)
+def start(run_foreground: bool):
+    run_foreground = run_foreground or os.getenv("GALV_HARVESTER_RUN_FOREGROUND", False)
+    click.echo("Attempting to start harvester.")
     # Check whether a config file already exists, if so, use it
-    if settings.get_setting('url'):
-        click.echo("Config file found, restarting harvester.")
-        run.run_cycle()
-        return
+    current_settings = settings.get_settings()
+    if current_settings:
+        click.echo(f"Config file found, restarting harvester {current_settings.get('name')}.")
+        if run_foreground:
+            run.run_cycle()
+        else:
+            subprocess.Popen(["python", "-m", "galv_harvester.run"])
+            click.echo(f"Harvester is running and logging to {settings.get_logfile()}")
     else:
-        click.echo("No config file found, please run `galv-harvester setup` wizard.")
-        click.echo("")
+        click.echo("Config file is not valid. Please run `galv-harvester setup` wizard.")
 
 
-@click_wrapper.command()
+@click_wrapper.command(
+    short_help="Setup the harvester using a setup wizard, envvars, or command-line arguments."
+)
 @click.version_option()
 @click.option('--url', type=str, help="API URL to register harvester with.")
 @click.option('--name', type=str, help="Name for the harvester.")
 @click.option('--api_token', type=str, help="Your API token. You must have admin access to at least one Lab.")
-@click.option('--lab_id', type=int, help="Id of the Lab to assign the Harvester to. Only required if you administrate multiple Labs.")
-@click.option('--team_id', type=int, help="Id of the Team to create a Monitored Path for. Only required if you administrate multiple Teams and wish to create a monitored path.")
+@click.option('--lab_id', type=int,
+              help="Id of the Lab to assign the Harvester to. Only required if you administrate multiple Labs.")
+@click.option(
+    '--team_id',
+    type=int,
+    help=(
+            "Id of the Team to create a Monitored Path for. "
+            "Only required if you administrate multiple Teams and wish to create a monitored path."
+    )
+)
 @click.option('--monitor_path', type=str, help="Path to harvest files from.")
-@click.option('--monitor_path_regex', type=str, help="Regex to match files to harvest. Other options can be specified using the frontend.")
+@click.option('--monitor_path_regex', type=str,
+              help="Regex to match files to harvest. Other options can be specified using the frontend.")
 @click.option(
     '--run_foreground',
     is_flag=True,
@@ -442,13 +482,7 @@ def setup(
         monitor_path: str, monitor_path_regex: str,
         run_foreground: bool
 ):
-    restart = os.getenv("GALV_HARVESTER_RESTART", False)
-
-    if restart and not any([url, name, api_token, lab_id, team_id, monitor_path, monitor_path_regex]):
-        click.echo("Restarting harvester because GALV_HARVESTER_RESTART envvar is set.")
-        run.run_cycle()
-        return
-
+    run_foreground = run_foreground or os.getenv("GALV_HARVESTER_RUN_FOREGROUND", False)
     click.echo("Welcome to Harvester setup.")
     register(
         url=url, name=name, api_token=api_token, lab_id=lab_id, team_id=team_id,

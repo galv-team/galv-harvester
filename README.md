@@ -23,10 +23,11 @@ This will install the harvester and its dependencies, and make the `galv-harvest
 
 ## Usage
 
-Run the harvester using the following command:
+The first time you use the harvester, it will have to register itself with the Galv server.
+To set up the harvester, using the following command:
 
 ```bash
-galv-harvester
+galv-harvester setup
 ```
 
 The harvester will prompt you for the necessary settings to connect to the Galv server (see [Initial Setup](#initial-setup)).
@@ -74,7 +75,6 @@ For details on the variables you can set, and whether they are necessary, see th
 
 ```yaml
 # .env
-GALV_HARVESTER_RESTART=1
 GALV_HARVESTER_SERVER_URL=<your_server_url>
 GALV_HARVESTER_NAME=<your_harvester_name>
 GALV_HARVESTER_API_TOKEN=<your_api_token>
@@ -94,7 +94,7 @@ you can also edit the `docker-compose.yml` file to include the path as a volume.
 You can also specify harvester properties as command line arguments:
 
 ```text
-Usage: galv-harvester [OPTIONS]
+Usage: galv-harvester setup [OPTIONS]
 
 Options:
   --version                  Show the version and exit.
@@ -121,8 +121,6 @@ Options:
 For details on the variables you can set, and when they are necessary, see the [variable details](#variable-details) section.
 
 ## Variable details
-
-- `GALV_HARVESTER_RESTART`: If set to 1, the harvester will attempt to resume from a previous configuration file.
 
 If not restarting from a previous configuration, the following variables are required, 
 and will be prompted for by the wizard if not set (unless `GALV_HARVESTER_SKIP_WIZARD` is set to `true`).
@@ -157,7 +155,24 @@ Monitored Paths can only be created and edited by Team administrators, as a secu
 If you need to restart the harvester, you can do so by running the following command:
 
 ```bash
-galv-harvester restart
+galv-harvester start
 ```
 
 This will restart the harvester using the previously-configured settings.
+
+## Harvesting specific files/directories
+
+If you want to harvest specific files or directories, or run the entire harvest cycle manually, 
+you can do so with the command `galv-harvester harvest`.
+
+With no arguments, this will harvest each monitored path in turn.
+
+You can also specify paths to harvest:
+
+```bash
+galv-harvester harvest /path/to/directory /path/to/another/directory/file.csv /path/to/somewhere/else
+```
+
+This will harvest the specified paths, and only those paths. 
+**Note**: The paths must be included in the monitored paths for the harvester.
+This includes the regex pattern, if specified. 
