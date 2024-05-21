@@ -52,7 +52,7 @@ def report_harvest_result(
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")
         out = None
-    logger.info(f"API call finished in {round(time.time() - start, 2)}")
+    logger.info(f"API call finished in {round(time.time() - start, 2)}s")
     return out
 
 

@@ -157,7 +157,7 @@ Monitored Paths can only be created and edited by Team administrators, as a secu
 If you need to restart the harvester, you can do so by running the following command:
 
 ```bash
-galv-harvester --restart
+galv-harvester restart
 ```
 
 This will restart the harvester using the previously-configured settings.

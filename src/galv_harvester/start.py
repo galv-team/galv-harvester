@@ -12,7 +12,6 @@ import requests
 
 from . import run, settings
 
-
 def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs):
     while retries > 0:
         try:
@@ -60,7 +59,7 @@ def create_monitored_path(
     # TODO: Ensure that the team is a member of the harvester's lab
     click.echo("The harvester will monitor a path on the server for changes and upload files.")
     click.echo("You must be a Team administrator to create a monitored path. "
-                "Note that Lab administrators are not necessarily Team administrators.")
+               "Note that Lab administrators are not necessarily Team administrators.")
 
     def monitored_path_exit(error: str):
         click.echo('Harvester successfully created, but the monitored path could not be set.')
@@ -354,7 +353,74 @@ def register(
         click.echo(f"Complete. Harvester is running and logging to {settings.get_logfile()}")
 
 
-@click.command()
+@click.group()
+def click_wrapper():
+    pass
+
+
+@click_wrapper.command()
+@click.option('--path', type=str, help="File/Directory to harvest files from. If left blank, all Monitored Paths in the config will be harvested.")
+def harvest(path: str):
+    # Check we can access settings
+    try:
+        current_settings = settings.get_settings()
+    except FileNotFoundError:
+        click.echo("No settings file found. Please run `galv-harvester setup` wizard.")
+        exit(1)
+
+    if path:
+        path = os.path.abspath(path)
+        # Check the path is valid
+        if not os.path.exists(path):
+            click.echo(f"Path {path} does not exist on the filesystem.")
+            exit(1)
+        # Check the path is on a monitored path
+        monitored_paths = current_settings.get('monitored_paths', [])
+        monitored_path = None
+        for mp in monitored_paths:
+            # A match is where the path is a substring of the monitored path
+            if not path.lower().startswith(mp['path'].lower()):
+                continue
+            # and the regex matches (for files)
+            if os.path.isfile(path):
+                if re.match(mp['regex'], os.path.relpath(path, mp['path'])):
+                    monitored_path = mp
+                    break
+            elif os.path.isdir(path):
+                monitored_path = mp
+                break
+        if not monitored_path:
+            click.echo(f"Could not find {path} in any monitored paths.")
+            click.echo(f"Available monitored paths [path : regex] are:")
+            for mp in monitored_paths:
+                click.echo(f"{mp['path']} : {mp['regex']}")
+            exit(1)
+
+        # Harvest the path
+        if os.path.isfile(path):
+            run.harvest_file(path, monitored_path)
+        else:
+            run.harvest_path(monitored_path)
+        return
+
+    # Run the harvester for a single cycle
+    run.harvest()
+
+
+@click_wrapper.command()
+def restart():
+    click.echo("Attempting to restart harvester.")
+    # Check whether a config file already exists, if so, use it
+    if settings.get_setting('url'):
+        click.echo("Config file found, restarting harvester.")
+        run.run_cycle()
+        return
+    else:
+        click.echo("No config file found, please run `galv-harvester setup` wizard.")
+        click.echo("")
+
+
+@click_wrapper.command()
 @click.version_option()
 @click.option('--url', type=str, help="API URL to register harvester with.")
 @click.option('--name', type=str, help="Name for the harvester.")
@@ -371,28 +437,17 @@ def register(
             "(will not close the thread, useful for Dockerized application)."
     )
 )
-@click.option(
-    '--restart',
-    is_flag=True,
-    help="Ignore other options and run harvester if config file already exists."
-)
-def click_wrapper(
+def setup(
         url: str, name: str, api_token: str, lab_id: int, team_id: int,
         monitor_path: str, monitor_path_regex: str,
-        run_foreground: bool, restart: bool
+        run_foreground: bool
 ):
-    restart = restart or os.getenv("GALV_HARVESTER_RESTART", False)
+    restart = os.getenv("GALV_HARVESTER_RESTART", False)
 
-    if restart:
-        click.echo("Attempting to restart harvester.")
-        # Check whether a config file already exists, if so, use it
-        if settings.get_setting('url'):
-            click.echo("Config file found, restarting harvester.")
-            run.run_cycle()
-            return
-        else:
-            click.echo("No config file found, continuing to setup.")
-            click.echo("")
+    if restart and not any([url, name, api_token, lab_id, team_id, monitor_path, monitor_path_regex]):
+        click.echo("Restarting harvester because GALV_HARVESTER_RESTART envvar is set.")
+        run.run_cycle()
+        return
 
     click.echo("Welcome to Harvester setup.")
     register(
