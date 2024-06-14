@@ -68,7 +68,11 @@ class HarvestProcessor:
                 logger.debug('...failed with: ', type(e), e)
                 continue
             except Exception as e:
-                logger.error(f"{input_file_cls.__name__} failed to import {file_path} with non-UnsupportedFileTypeError: {e}")
+                logger.error((
+                    f"{input_file_cls.__name__} failed to import"
+                    f" {file_path} with non-UnsupportedFileTypeError: {e}"
+                ))
+                continue
             logger.debug('...succeeded...')
             self.input_file = input_file
             self.parser = input_file_cls

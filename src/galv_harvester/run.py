@@ -49,6 +49,10 @@ def harvest():
 
 
 def harvest_file(file_path, monitored_path: dict, compiled_regex: re.Pattern = None):
+    if os.path.basename(file_path).startswith('.'):
+        logger.debug(f"Skipping hidden file {file_path}")
+        return
+
     if compiled_regex is None:
         regex_str = monitored_path.get('regex')
         if regex_str is not None:
