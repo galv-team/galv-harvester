@@ -65,14 +65,6 @@ def get_setting(*args):
     return [settings.get(arg) for arg in args]
 
 
-def get_standard_units():
-    return {u['name']: u['id'] for u in get_setting('standard_units')}
-
-
-def get_standard_columns():
-    return {u['name']: u['id'] for u in get_setting('standard_columns')}
-
-
 def update_envvars():
     envvars = get_setting('environment_variables') or {}
     for k, v in envvars.items():
