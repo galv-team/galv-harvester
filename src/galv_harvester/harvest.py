@@ -17,6 +17,7 @@ import holoviews as hv
 import holoviews.operation.datashader as hd
 
 from . import settings
+from .parse.arbin import ArbinCSVFile
 from .parse.exceptions import UnsupportedFileTypeError
 from .parse.ivium_input_file import IviumInputFile
 from .parse.biologic_input_file import BiologicMprInputFile
@@ -41,6 +42,7 @@ class HarvestProcessor:
         MaccorInputFile,
         MaccorExcelInputFile,
         MaccorRawInputFile,
+        ArbinCSVFile,
         DelimitedInputFile  # Should be last because it processes files line by line and accepts anything table-like
     ]
 

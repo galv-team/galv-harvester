@@ -95,7 +95,7 @@ class TestHarvester(unittest.TestCase):
         mock_report.return_value = JSONResponse(200, {'state': 'STABLE'})
         galv_harvester.run.harvest_path(ConfigResponse().json()['monitored_paths'][0])
         files = []
-        expected_file_count = 9
+        expected_file_count = 11
         for c in mock_processor.call_args_list:
             f = c.args[0]
             if f not in files:
@@ -119,7 +119,7 @@ class TestHarvester(unittest.TestCase):
     @patch('galv_harvester.harvest.report_harvest_result')
     @patch('galv_harvester.harvest.logger')
     @patch('galv_harvester.settings.get_settings')
-    def import_file(self, filename, mock_settings, mock_logger, mock_report, mock_get, mock_post, additional_checks=None):
+    def _import_file(self, mock_settings, mock_logger, mock_report, mock_get, mock_post, filename=None, additional_checks=None):
         mock_settings.return_value = ConfigResponse().json()
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(
@@ -138,6 +138,9 @@ class TestHarvester(unittest.TestCase):
         self.validate_report_calls(mock_report.call_args_list)
         if additional_checks:
             additional_checks(mock_report.call_args_list)
+
+    def import_file(self, filename, additional_checks=None):
+        self._import_file(filename=filename, additional_checks=additional_checks)
 
     def validate_report_calls(self, calls):
         stages = ['file metadata', 'data summary', 'upload parquet partitions', 'upload complete']
@@ -209,6 +212,24 @@ class TestHarvester(unittest.TestCase):
             raise AssertionError(f"Could not find import report with 'preamble'")
 
         self.import_file('preamble.csv', additional_checks=validate_preamble)
+
+    def test_import_xslx(self):
+        with self.assertRaises(Exception):
+            self.import_file('bad.xlsx')
+
+    def test_import_arbin(self):
+        def validate_column_count(calls):
+            cols = 33
+            for c in calls:
+                if (c.kwargs['content']['task'] == settings.HARVESTER_TASK_IMPORT and
+                        c.kwargs['content']['stage'] == settings.HARVEST_STAGE_FILE_METADATA):
+                    if len(c.kwargs['content'].get('data', {}).get('extra_metadata', {})) != cols:
+                        raise AssertionError(f"Expected import report to contain {cols} columns")
+                    else:
+                        return
+            raise AssertionError(f"Could not find import report with {cols} columns")
+
+        self.import_file('arbin.csv', validate_column_count)
 
 
 if __name__ == '__main__':
