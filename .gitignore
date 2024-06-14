@@ -15,6 +15,7 @@ env
 
 .test-data/**/*.*
 !.test-data/**/*.csv
+!.test-data/**/.DS_Store
 
 **/.env.*
 .harvester/
