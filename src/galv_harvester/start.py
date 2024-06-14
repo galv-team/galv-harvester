@@ -10,7 +10,7 @@ import time
 import click
 import requests
 
-from . import run, settings
+from . import run, settings, api
 
 
 def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs):
@@ -186,7 +186,7 @@ def register(
         url: str = None, name: str = None, api_token: str = None,
         lab_id: int = None, team_id: int = None,
         monitor_path: str = None, monitor_path_regex: str = ".*",
-        run_foreground: bool = None
+        foreground: bool = None
 ):
     """
     Guide a user through the setup process.
@@ -209,7 +209,7 @@ def register(
     team_id = team_id or os.getenv("GALV_HARVESTER_TEAM_ID")
     monitor_path = monitor_path or os.getenv("GALV_HARVESTER_MONITOR_PATH")
     monitor_path_regex = monitor_path_regex or os.getenv("GALV_HARVESTER_MONITOR_PATH_REGEX")
-    run_foreground = run_foreground or os.getenv("GALV_HARVESTER_RUN_FOREGROUND", False)
+    foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", False)
 
     # Check we can connect to the API
     if url is not None:
@@ -348,11 +348,19 @@ def register(
     click.echo("")
     click.echo("The harvester will check for updates frequently until you change its polling rate when you update it.")
     click.echo("Launching harvester...")
-    if run_foreground:
+    if foreground:
         run.run_cycle()
     else:
-        subprocess.Popen(["python", "-m", "galv_harvester.run"])
+        subprocess.Popen(["galv-harvester", "start"])
         click.echo(f"Complete. Harvester is running and logging to {settings.get_logfile()}")
+
+
+def sync():
+    try:
+        api.update_config()
+    except BaseException as e:
+        click.echo(f"Error updating harvester config: {e}", err=True)
+        raise e
 
 
 @click.group()
@@ -375,6 +383,8 @@ PATHS: Files/Directories to harvest files from. If left blank, all Monitored Pat
 def harvest(paths):
     # Check we can access settings
     try:
+        settings.get_settings()
+        sync()
         current_settings = settings.get_settings()
     except FileNotFoundError:
         click.echo("No settings file found. Please run `galv-harvester setup` wizard.")
@@ -426,24 +436,25 @@ def harvest(paths):
     short_help="Start the harvester using existing config settings."
 )
 @click.option(
-    '--run_foreground',
+    '--foreground',
     is_flag=True,
     help=(
             "On completion, run the harvester in the foreground "
             "(will not close the thread, useful for Dockerized application)."
     )
 )
-def start(run_foreground: bool):
-    run_foreground = run_foreground or os.getenv("GALV_HARVESTER_RUN_FOREGROUND", False)
+def start(foreground: bool):
+    foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", True)
     click.echo("Attempting to start harvester.")
     # Check whether a config file already exists, if so, use it
     current_settings = settings.get_settings()
     if current_settings:
+        sync()
         click.echo(f"Config file found, restarting harvester {current_settings.get('name')}.")
-        if run_foreground:
+        if foreground:
             run.run_cycle()
         else:
-            subprocess.Popen(["python", "-m", "galv_harvester.run"])
+            subprocess.Popen(["galv-harvester", "start"])
             click.echo(f"Harvester is running and logging to {settings.get_logfile()}")
     else:
         click.echo("Config file is not valid. Please run `galv-harvester setup` wizard.")
@@ -470,7 +481,7 @@ def start(run_foreground: bool):
 @click.option('--monitor_path_regex', type=str,
               help="Regex to match files to harvest. Other options can be specified using the frontend.")
 @click.option(
-    '--run_foreground',
+    '--foreground',
     is_flag=True,
     help=(
             "On completion, run the harvester in the foreground "
@@ -480,14 +491,14 @@ def start(run_foreground: bool):
 def setup(
         url: str, name: str, api_token: str, lab_id: int, team_id: int,
         monitor_path: str, monitor_path_regex: str,
-        run_foreground: bool
+        foreground: bool
 ):
-    run_foreground = run_foreground or os.getenv("GALV_HARVESTER_RUN_FOREGROUND", False)
+    foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", False)
     click.echo("Welcome to Harvester setup.")
     register(
         url=url, name=name, api_token=api_token, lab_id=lab_id, team_id=team_id,
         monitor_path=monitor_path, monitor_path_regex=monitor_path_regex,
-        run_foreground=run_foreground
+        foreground=foreground
     )
 
 

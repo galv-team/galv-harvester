@@ -31,9 +31,6 @@ class InputFile:
         """
         raise UnsupportedFileTypeError()
 
-    def get_data_labels(self):
-        raise UnsupportedFileTypeError()
-
     def load_metadata(self):
         """
             returns a tuple of (metadata, column_info)

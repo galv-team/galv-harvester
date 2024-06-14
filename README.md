@@ -3,6 +3,7 @@
 
 [![PyPI - Version](https://img.shields.io/pypi/v/galv-harvester)](https://pypi.org/project/galv-harvester/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/galv-harvester)](https://pypi.org/project/galv-harvester/)
+
 [![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
 [![Test, Build, and Publish](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml/badge.svg)](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml)
 
@@ -63,7 +64,7 @@ and the Team that the monitored path will belong to.
 
 The Harvester will register itself with the Galv server and begin to monitor for data files.
 
-The `--run_foreground` flag is optional, and will keep the harvester running in the foreground.
+The `--foreground` flag is optional, and will keep the harvester running in the foreground.
 
 ### Using environment variables
 
@@ -83,7 +84,7 @@ GALV_HARVESTER_TEAM_ID=<your_team_id>
 GALV_HARVESTER_MONITOR_PATH=<your_monitor_path>
 GALV_HARVESTER_MONITOR_PATH_REGEX=<your_monitor_path_regex>
 GALV_HARVESTER_SKIP_WIZARD=<true_or_omit>
-GALV_HARVESTER_RUN_FOREGROUND=<true_or_omit>
+GALV_HARVESTER_FOREGROUND=<true_or_omit>
 ```
 
 If you don't want to have to specify the path to the data directory every time you start the harvester,
@@ -110,7 +111,7 @@ Options:
   --monitor_path TEXT        Path to harvest files from.
   --monitor_path_regex TEXT  Regex to match files to harvest. Other options
                              can be specified using the frontend.
-  --run_foreground           On completion, run the harvester in the
+  --foreground           On completion, run the harvester in the
                              foreground (will not close the thread, useful for
                              Dockerized application).
   --restart                  Ignore other options and run harvester if config
@@ -138,7 +139,7 @@ If you want to set up a monitored path, the following variables are required:
 You may also optionally specify the following variables:
 - `GALV_HARVESTER_MONITOR_PATH_REGEX`: A regex pattern to match files in the monitored path. Only files that match this pattern will be uploaded to the Galv server.
 - `GALV_HARVESTER_SKIP_WIZARD`: If set to `true`, the harvester will not prompt you for any missing variables and setup will fail if necessary variables are not set.
-- `GALV_HARVESTER_RUN_FOREGROUND`: If set to `true`, the harvester will run in the foreground.
+- `GALV_HARVESTER_FOREGROUND`: If set to `true`, the harvester will run in the foreground.
 
 ## Further setup
 
