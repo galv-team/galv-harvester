@@ -23,7 +23,7 @@ class ArbinCSVFile(InputFile):
 
         :raises UnsupportedFileTypeError: if the file is not a supported type
         """
-        with open(file_path, newline='') as csvfile:
+        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
             try:
                 reader = csv.reader(
                     csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL

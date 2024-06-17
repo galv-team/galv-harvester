@@ -15,6 +15,7 @@ env
 
 .test-data/**/*.*
 !.test-data/**/*.csv
+.test-data/spam/*.csv
 !.test-data/test-suite-small/*.xlsx
 
 **/.env.*
