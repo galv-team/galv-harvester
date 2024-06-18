@@ -126,7 +126,6 @@ class TestHarvester(unittest.TestCase):
             200,
             # An amalgam of the expected report content for different calls
             {
-                'upload_info': {'last_record_number': 0, 'columns': []},
                 'mapping': 'http://localhost'
             }
         )

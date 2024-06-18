@@ -125,7 +125,7 @@ class HarvestProcessor:
 
     def _report_file_metadata(self):
         """
-        Report a file's metadata, and save the server response to self.server_metadata
+        Report a file's metadata
         """
         core_metadata, extra_metadata = self.input_file.load_metadata()
         report = report_harvest_result(
@@ -143,7 +143,6 @@ class HarvestProcessor:
             }
         )
         HarvestProcessor.check_response("Report Metadata", report)
-        self.server_metadata = report.json()['upload_info']
 
     def _report_summary(self):
         """
