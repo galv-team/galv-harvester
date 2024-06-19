@@ -281,7 +281,7 @@ class HarvestProcessor:
                     dataset.to(hv.Curve, 'ElapsedTime_s', 'Current_A')
             )
             layout.opts(hv.opts.Curve(framewise=True, aspect=4, sublabel_format=''))
-            hv.save(layout, self.png_file_name, fmt='png')
+            hv.save(layout, self.png_file_name, fmt='png', dpi=300)
             self.png_ok = True
         except Exception as e:
             logger.warning(f"Failed to create plot: {e}")
