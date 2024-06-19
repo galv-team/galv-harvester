@@ -151,7 +151,10 @@ class MaccorInputFile(InputFile):
 
         with open(file_path, "r", encoding='utf-8-sig') as csvfile:
             # get rid of metadata rows
-            csvfile.readline()
+            try:
+                csvfile.readline()
+            except UnicodeDecodeError as e:
+                raise UnsupportedFileTypeError from e
             if self.num_header_rows > 1:
                 csvfile.readline()
 
@@ -306,7 +309,10 @@ class MaccorInputFile(InputFile):
 
     def is_maccor_text_file(self, file_path, delimiter):
         with open(file_path, "r", encoding='utf-8-sig') as f:
-            line = f.readline()
+            try:
+                line = f.readline()
+            except UnicodeDecodeError as e:
+                raise UnsupportedFileTypeError from e
             line_start = "Today''s Date" + delimiter
             date_regex = r"\d\d\/\d\d\/\d\d\d\d \d?\d:\d\d:\d\d [AP]M"
             if not line.startswith(line_start):
@@ -586,8 +592,11 @@ class MaccorRawInputFile(MaccorInputFile):
     def validate_file(self, file_path):
         self.logger.debug('is_maccor_raw_file')
         with open(file_path, "r", encoding='utf-8-sig') as f:
-            self.logger.debug('got line')
-            line = f.readline()
+            try:
+                self.logger.debug('got line')
+                line = f.readline()
+            except UnicodeDecodeError as e:
+                raise UnsupportedFileTypeError from e
             self.logger.debug('got line', line)
             line_start = "Today's Date"
             if not line.startswith(line_start):

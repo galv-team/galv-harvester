@@ -35,6 +35,11 @@ class DelimitedInputFile(InputFile):
         :raises UnsupportedFileTypeError: if the file is not a supported type
         """
         with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
+            try:
+                csvfile.readline()
+            except UnicodeDecodeError as e:
+                raise UnsupportedFileTypeError from e
+
             last_line = 0
             chunk_size = 1024
             lines_to_check = 100
