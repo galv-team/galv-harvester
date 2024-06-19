@@ -39,6 +39,7 @@ dependencies = [
     "xlrd~=2.0.1",
     "psutil~=5.9.4",
     "holoviews~=1.18.3",
+    "matplotlib~=3.9.0",
     "datashader~=0.16.1",
 ]
 
