@@ -401,7 +401,7 @@ def harvest(paths):
                     continue
                 # and the regex matches (for files)
                 if os.path.isfile(path):
-                    if re.match(mp['regex'], os.path.relpath(path, mp['path'])):
+                    if re.search(mp['regex'], os.path.relpath(path, mp['path'])) is not None:
                         monitored_path = mp
                         break
                 elif os.path.isdir(path):
