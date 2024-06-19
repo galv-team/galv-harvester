@@ -42,7 +42,7 @@ class ArbinCSVFile(InputFile):
     def load_data(self, file_path, columns):
         column_names = self.header
 
-        with open(file_path, newline='') as csvfile:
+        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
             reader = csv.reader(csvfile, dialect=self.dialect)
             next(reader)
             for row in reader:

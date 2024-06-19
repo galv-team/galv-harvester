@@ -149,7 +149,7 @@ class MaccorInputFile(InputFile):
             Load data in a maccor csv or tsv file"
         """
 
-        with open(file_path, "r") as csvfile:
+        with open(file_path, "r", encoding='utf-8-sig') as csvfile:
             # get rid of metadata rows
             csvfile.readline()
             if self.num_header_rows > 1:
@@ -305,7 +305,7 @@ class MaccorInputFile(InputFile):
                 )
 
     def is_maccor_text_file(self, file_path, delimiter):
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding='utf-8-sig') as f:
             line = f.readline()
             line_start = "Today''s Date" + delimiter
             date_regex = r"\d\d\/\d\d\/\d\d\d\d \d?\d:\d\d:\d\d [AP]M"
@@ -585,7 +585,7 @@ class MaccorRawInputFile(MaccorInputFile):
 
     def validate_file(self, file_path):
         self.logger.debug('is_maccor_raw_file')
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding='utf-8-sig') as f:
             self.logger.debug('got line')
             line = f.readline()
             self.logger.debug('got line', line)

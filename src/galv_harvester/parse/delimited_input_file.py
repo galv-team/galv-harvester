@@ -34,7 +34,7 @@ class DelimitedInputFile(InputFile):
 
         :raises UnsupportedFileTypeError: if the file is not a supported type
         """
-        with open(file_path, newline='') as csvfile:
+        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
             last_line = 0
             chunk_size = 1024
             lines_to_check = 100
@@ -103,7 +103,7 @@ class DelimitedInputFile(InputFile):
 
         column_names = [self.header[i] for i in column_numbers]
 
-        with open(file_path, newline='') as csvfile:
+        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
             self.spin_to_line(csvfile, self.data_start)
             reader = csv.reader(csvfile, dialect=self.dialect)
             if self.has_header:
