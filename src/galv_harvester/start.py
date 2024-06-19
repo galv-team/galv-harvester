@@ -414,6 +414,7 @@ def harvest(paths):
                     for mp in monitored_paths:
                         click.echo(f"{mp['path']} : {mp['regex']}")
                     printed_paths = True
+                continue
 
             # Harvest the path
             if os.path.isfile(path):
