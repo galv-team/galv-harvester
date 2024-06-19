@@ -151,15 +151,15 @@ you'll see the Harvester listed in the 'Harvesters' tab.
 You can add new monitored paths to the Harvester, or change the Harvester's settings (if you have appropriate permissions).
 Monitored Paths can only be created and edited by Team administrators, as a security measure.
 
-## Restarting the harvester
+## Starting the harvester
 
-If you need to restart the harvester, you can do so by running the following command:
+When the harvester is set up, you can start it by running the following command:
 
 ```bash
 galv-harvester start
 ```
 
-This will restart the harvester using the previously-configured settings.
+This will start the harvester using the previously-configured settings.
 
 ## Harvesting specific files/directories
 

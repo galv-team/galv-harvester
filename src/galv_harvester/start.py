@@ -346,13 +346,7 @@ def register(
         f"{url} or going to the frontend."
     )
     click.echo("")
-    click.echo("The harvester will check for updates frequently until you change its polling rate when you update it.")
-    click.echo("Launching harvester...")
-    if foreground:
-        run.run_cycle()
-    else:
-        subprocess.Popen(["galv-harvester", "start"])
-        click.echo(f"Complete. Harvester is running and logging to {settings.get_logfile()}")
+    click.echo("You can now run the harvester using `galv-harvester start`.")
 
 
 def sync():
@@ -480,25 +474,14 @@ def start(foreground: bool):
 @click.option('--monitor_path', type=str, help="Path to harvest files from.")
 @click.option('--monitor_path_regex', type=str,
               help="Regex to match files to harvest. Other options can be specified using the frontend.")
-@click.option(
-    '--foreground',
-    is_flag=True,
-    help=(
-            "On completion, run the harvester in the foreground "
-            "(will not close the thread, useful for Dockerized application)."
-    )
-)
 def setup(
         url: str, name: str, api_token: str, lab_id: int, team_id: int,
-        monitor_path: str, monitor_path_regex: str,
-        foreground: bool
+        monitor_path: str, monitor_path_regex: str
 ):
-    foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", False)
     click.echo("Welcome to Harvester setup.")
     register(
         url=url, name=name, api_token=api_token, lab_id=lab_id, team_id=team_id,
-        monitor_path=monitor_path, monitor_path_regex=monitor_path_regex,
-        foreground=foreground
+        monitor_path=monitor_path, monitor_path_regex=monitor_path_regex
     )
 
 
