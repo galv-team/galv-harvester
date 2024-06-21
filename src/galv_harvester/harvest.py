@@ -300,26 +300,27 @@ class HarvestProcessor:
 
         for i in range(self.partition_count):
             filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{pad0(i)}.parquet"
-            files = {'parquet_file': (filename, open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb'))}
-            report = report_harvest_result(
-                path=self.file_path,
-                monitored_path_id=self.monitored_path.get('id'),
-                # send data in a flat format to accompany file upload protocol.
-                # Kinda hacky because it overwrites much of report_harvest_result's functionality
-                data={
-                    'format': 'flat',
-                    'status': settings.HARVESTER_STATUS_SUCCESS,
-                    'path': self.file_path,
-                    'monitored_path_id': self.monitored_path.get('id'),
-                    'task': settings.HARVESTER_TASK_IMPORT,
-                    'stage': settings.HARVEST_STAGE_UPLOAD_PARQUET,
-                    'total_row_count': self.row_count,
-                    'partition_number': i,
-                    'partition_count': self.partition_count,
-                    'filename': filename
-                },
-                files=files
-            )
+            with open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb') as f:
+                files = {'parquet_file': (filename, f)}
+                report = report_harvest_result(
+                    path=self.file_path,
+                    monitored_path_id=self.monitored_path.get('id'),
+                    # send data in a flat format to accompany file upload protocol.
+                    # Kinda hacky because it overwrites much of report_harvest_result's functionality
+                    data={
+                        'format': 'flat',
+                        'status': settings.HARVESTER_STATUS_SUCCESS,
+                        'path': self.file_path,
+                        'monitored_path_id': self.monitored_path.get('id'),
+                        'task': settings.HARVESTER_TASK_IMPORT,
+                        'stage': settings.HARVEST_STAGE_UPLOAD_PARQUET,
+                        'total_row_count': self.row_count,
+                        'partition_number': i,
+                        'partition_count': self.partition_count,
+                        'filename': filename
+                    },
+                    files=files
+                )
             if report is None:
                 errors[i] = (f"Failed to upload {filename} - API Error: no response from server")
             elif not report.ok:
@@ -353,23 +354,24 @@ class HarvestProcessor:
         )
 
         if self.png_ok:
-            files = {'png_file': (os.path.basename(self.png_file_name), open(self.png_file_name, 'rb'))}
-            report = report_harvest_result(
-                path=self.file_path,
-                monitored_path_id=self.monitored_path.get('id'),
-                # send data in a flat format to accompany file upload protocol.
-                # Kinda hacky because it overwrites much of report_harvest_result's functionality
-                data={
-                    'format': 'flat',
-                    'status': settings.HARVESTER_STATUS_SUCCESS,
-                    'path': self.file_path,
-                    'monitored_path_id': self.monitored_path.get('id'),
-                    'task': settings.HARVESTER_TASK_IMPORT,
-                    'stage': settings.HARVEST_STAGE_UPLOAD_PNG,
-                    'filename': os.path.basename(self.png_file_name)
-                },
-                files=files
-            )
+            with open(self.png_file_name, 'rb') as f:
+                files = {'png_file': f}
+                report = report_harvest_result(
+                    path=self.file_path,
+                    monitored_path_id=self.monitored_path.get('id'),
+                    # send data in a flat format to accompany file upload protocol.
+                    # Kinda hacky because it overwrites much of report_harvest_result's functionality
+                    data={
+                        'format': 'flat',
+                        'status': settings.HARVESTER_STATUS_SUCCESS,
+                        'path': self.file_path,
+                        'monitored_path_id': self.monitored_path.get('id'),
+                        'task': settings.HARVESTER_TASK_IMPORT,
+                        'stage': settings.HARVEST_STAGE_UPLOAD_PNG,
+                        'filename': os.path.basename(self.png_file_name)
+                    },
+                    files=files
+                )
             try:
                 HarvestProcessor.check_response("Upload PNG", report)
             except BaseException as e:
