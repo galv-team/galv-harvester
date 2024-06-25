@@ -28,16 +28,11 @@ from .parse.maccor_input_file import (
 )
 from .parse.delimited_input_file import DelimitedInputFile
 
-from .api import report_harvest_result
+from .api import report_harvest_result, StorageError
 
 from .__about__ import VERSION
 
 logger = settings.get_logger(__file__)
-
-
-
-class StorageError(RuntimeError):
-    pass
 
 
 class HarvestProcessor:
@@ -57,8 +52,6 @@ class HarvestProcessor:
             logger.error(f"{step} failed: no response from server")
             raise RuntimeError(f"{step} failed: no response from server")
         if not response.ok:
-            if response.status_code == 507:
-                raise StorageError(f"{step} failed: server storage full")
             try:
                 logger.error(f"{step} failed: {response.json()['error']}")
             except BaseException:
@@ -334,8 +327,6 @@ class HarvestProcessor:
             if report is None:
                 errors[i] = (f"Failed to upload {filename} - API Error: no response from server")
             elif not report.ok:
-                if report.status_code == 507:
-                    raise StorageError(f"Insufficient storage available: {report.json()['error']}")
                 try:
                     errors[i] = (f"Failed to upload {filename} - API responded with Error: {report.json()['error']}")
                 except BaseException:
@@ -407,142 +398,3 @@ class HarvestProcessor:
 
     def __del__(self):
         self._delete_temp_files()
-
-
-if False:
-    # My debugger won't connect, so running this in the console can figure out dask issues
-    import os
-    import pandas
-    import dask.dataframe
-    import shutil
-    import fastnumbers
-    import math
-    import holoviews as hv
-    import holoviews.operation.datashader as hd
-
-    from src.galv_harvester.parse.maccor_input_file import MaccorInputFile
-    file_path = '.test-data/test-suite-small/TPG1+-+Cell+15+-+002.txt'
-    input_file = MaccorInputFile(file_path)
-
-    mapping = {
-        "Amps": {
-            "new_name": "Current_A",
-            "data_type": "float",
-            "multiplier": 0.001,
-            "addition": 0
-        },
-        "Rec#": {
-            "new_name": "SampleNumber",
-            "data_type": "int",
-            "multiplier": 1,
-            "addition": 0
-        },
-        "Step": {
-            "new_name": "StepNumber",
-            "data_type": "int",
-            "multiplier": 1,
-            "addition": 0
-        },
-        "State": {
-            "new_name": "State",
-            "data_type": "str"
-        },
-        "Volts": {
-            "new_name": "Voltage_V",
-            "data_type": "float",
-            "multiplier": 1,
-            "addition": 0
-        },
-        "Temp 1": {
-            "new_name": "Temperature_K",
-            "data_type": "float",
-            "multiplier": 1,
-            "addition": 273.15
-        },
-        "DPt Time": {
-            "new_name": "Datetime",
-            "data_type": "datetime64[ns]"
-        },
-        "StepTime": {
-            "new_name": "Step_time_s",
-            "data_type": "float",
-            "multiplier": 1,
-            "addition": 0
-        },
-        "TestTime": {
-            "new_name": "ElapsedTime_s",
-            "data_type": "float",
-            "multiplier": 1,
-            "addition": 0
-        }
-    }
-
-    def remap(df, mapping):
-        columns = list(df.columns)
-        for col_name, mapping in mapping.items():
-            new_name = mapping['new_name']
-            if mapping['data_type'] in ["bool", "str"]:
-                df[new_name] = df[col_name].astype(mapping["data_type"])
-            elif mapping['data_type'] == 'datetime64[ns]':
-                df[new_name] = pandas.to_datetime(df[col_name])
-            else:
-                if mapping['data_type'] == 'int':
-                    df[new_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
-                else:
-                    df[new_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
-
-                addition = mapping.get('addition', 0)
-                multiplier = mapping.get('multiplier', 1)
-                df[new_name] = df[new_name] + addition
-                df[new_name] = df[new_name] * multiplier
-            df.drop(columns=[col_name], inplace=True)
-            columns.pop(columns.index(col_name))
-        # If there are any columns left, they are not in the mapping and should be converted to floats
-        for col_name in columns:
-            df[col_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
-        return df
-
-    def partition_generator(generator, partition_line_count=100_000):
-        def to_df(rows):
-            return remap(pandas.DataFrame(rows), mapping=mapping)
-
-        stopping = False
-        while not stopping:
-            rows = []
-            try:
-                for _ in range(partition_line_count):
-                    rows.append(next(generator))
-            except StopIteration:
-                stopping = True
-            yield to_df(rows)
-
-    partition_line_count = 100_000
-
-    reader = input_file.load_data(
-        file_path,
-        [c for c in input_file.column_info.keys() if input_file.column_info[c].get('has_data')]
-    )
-
-    data = dask.dataframe.from_map(
-        pandas.DataFrame,
-        partition_generator(reader, partition_line_count=partition_line_count)
-    )
-
-    data.compute()
-    print(f"Rows: {data.shape[0].compute()}")
-
-    # Create a plot of key data columns for identification purposes
-    hd.shade.cmap = ["lightblue", "darkblue"]
-    hv.extension("matplotlib")
-    hv.output(fig='png', backend="matplotlib")
-    dataset = hv.Dataset(data, 'ElapsedTime_s', ['Voltage_V', 'Current_A'])
-    layout = (
-            dataset.to(hv.Curve, 'ElapsedTime_s', 'Voltage_V') +
-            dataset.to(hv.Curve, 'ElapsedTime_s', 'Current_A')
-    )
-    layout.opts(hv.opts.Curve(framewise=True, aspect=4, sublabel_format=''))
-    hv.save(layout, 'test.tmp.hv.png', fmt='png')
-
-    # Then we would upload the data by getting presigned URLs for each partition
-    shutil.rmtree("test.tmp.parquet")
-    print('done')

@@ -13,6 +13,10 @@ import time
 logger = get_logger(__file__)
 
 
+class StorageError(RuntimeError):
+    pass
+
+
 def report_harvest_result(
         path,
         monitored_path_id: str,
@@ -47,8 +51,12 @@ def report_harvest_result(
             logger.error(f"Server returned invalid JSON (HTTP {out.status_code}): {error_text}")
             return None
         if not out.ok:
+            if out.status_code == 507:
+                raise StorageError(out.json())
             logger.error(f"Server returned error (HTTP {out.status_code}): {out.json()}")
             return None
+    except StorageError as e:
+        raise e
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")
         out = None
