@@ -52,6 +52,9 @@ class HarvestProcessor:
             logger.error(f"{step} failed: no response from server")
             raise RuntimeError(f"{step} failed: no response from server")
         if not response.ok:
+            if response.status_code == 507:
+                logger.error(f"{step} skipped (storage full): {response.json()['error']}")
+                return
             try:
                 logger.error(f"{step} failed: {response.json()['error']}")
             except BaseException:

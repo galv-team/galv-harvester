@@ -87,7 +87,7 @@ def harvest_file(file_path, monitored_path: dict, compiled_regex: re.Pattern = N
             result = result.json()
             status = result['state']
             logger.info(f"Server assigned status '{status}'")
-            if status in ['STABLE', 'RETRY IMPORT', 'MAP ASSIGNED']:
+            if status in ['STABLE', 'RETRY IMPORT', 'MAP ASSIGNED', 'AWAITING STORAGE']:
                 logger.info(f"Parsing file {rel_path}")
                 try:
                     file.harvest()
