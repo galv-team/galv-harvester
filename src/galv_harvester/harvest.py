@@ -35,6 +35,11 @@ from .__about__ import VERSION
 logger = settings.get_logger(__file__)
 
 
+
+class StorageError(RuntimeError):
+    pass
+
+
 class HarvestProcessor:
     registered_input_files = [
         BiologicMprInputFile,
@@ -53,8 +58,7 @@ class HarvestProcessor:
             raise RuntimeError(f"{step} failed: no response from server")
         if not response.ok:
             if response.status_code == 507:
-                logger.error(f"{step} skipped (storage full): {response.json()['error']}")
-                return
+                raise StorageError(f"{step} failed: server storage full")
             try:
                 logger.error(f"{step} failed: {response.json()['error']}")
             except BaseException:
@@ -111,20 +115,23 @@ class HarvestProcessor:
         """
         Report the file metadata, column metadata, and upload the data to the server
         """
-        metadata_time = time.time()
-        self._report_file_metadata()
-        column_time = time.time()
-        logger.info(f"Metadata reported in {column_time - metadata_time:.2f} seconds")
-        self._report_summary()
-        if self.mapping is not None:
-            data_prep_time = time.time()
-            logger.info(f"Column metadata reported in {data_prep_time - column_time:.2f} seconds")
-            self._prepare_data()
-            upload_time = time.time()
-            logger.info(f"Data prepared in {upload_time - data_prep_time:.2f} seconds")
-            self._upload_data()
-            logger.info(f"Data uploaded in {time.time() - upload_time:.2f} seconds")
-            self._delete_temp_files()
+        try:
+            metadata_time = time.time()
+            self._report_file_metadata()
+            column_time = time.time()
+            logger.info(f"Metadata reported in {column_time - metadata_time:.2f} seconds")
+            self._report_summary()
+            if self.mapping is not None:
+                data_prep_time = time.time()
+                logger.info(f"Column metadata reported in {data_prep_time - column_time:.2f} seconds")
+                self._prepare_data()
+                upload_time = time.time()
+                logger.info(f"Data prepared in {upload_time - data_prep_time:.2f} seconds")
+                self._upload_data()
+                logger.info(f"Data uploaded in {time.time() - upload_time:.2f} seconds")
+                self._delete_temp_files()
+        except StorageError as e:
+            logger.error(f"Skipping file due to StorageError: {e}")
 
     def _report_file_metadata(self):
         """
@@ -327,6 +334,8 @@ class HarvestProcessor:
             if report is None:
                 errors[i] = (f"Failed to upload {filename} - API Error: no response from server")
             elif not report.ok:
+                if report.status_code == 507:
+                    raise StorageError(f"Insufficient storage available: {report.json()['error']}")
                 try:
                     errors[i] = (f"Failed to upload {filename} - API responded with Error: {report.json()['error']}")
                 except BaseException:
