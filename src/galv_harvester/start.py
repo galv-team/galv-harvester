@@ -358,6 +358,7 @@ def sync():
 
 
 @click.group()
+@click.version_option()
 def click_wrapper():
     pass
 
@@ -366,14 +367,10 @@ def click_wrapper():
     help="""
 PATHS: Files/Directories to harvest files from. If left blank, all Monitored Paths in the config will be harvested.
 """,
-    short_help="Run the harvester manually."
+    short_help="Run the harvester manually.",
 )
-@click.argument(
-    'paths',
-    type=str,
-    nargs=-1,
-    required=False
-)
+@click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
+@click.argument("paths", type=str, nargs=-1, required=False)
 def harvest(paths):
     # Check we can access settings
     try:
@@ -427,16 +424,15 @@ def harvest(paths):
     run.harvest()
 
 
-@click_wrapper.command(
-    short_help="Start the harvester using existing config settings."
-)
+@click_wrapper.command(short_help="Start the harvester using existing config settings.")
+@click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
 @click.option(
-    '--foreground',
+    "--foreground",
     is_flag=True,
     help=(
-            "On completion, run the harvester in the foreground "
-            "(will not close the thread, useful for Dockerized application)."
-    )
+        "On completion, run the harvester in the foreground "
+        "(will not close the thread, useful for Dockerized application)."
+    ),
 )
 def start(foreground: bool):
     foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", True)
@@ -445,44 +441,69 @@ def start(foreground: bool):
     current_settings = settings.get_settings()
     if current_settings:
         sync()
-        click.echo(f"Config file found, restarting harvester {current_settings.get('name')}.")
+        click.echo(
+            f"Config file found, restarting harvester {current_settings.get('name')}."
+        )
         if foreground:
             run.run_cycle()
         else:
             subprocess.Popen(["galv-harvester", "start"])
             click.echo(f"Harvester is running and logging to {settings.get_logfile()}")
     else:
-        click.echo("Config file is not valid. Please run `galv-harvester setup` wizard.")
+        click.echo(
+            "Config file is not valid. Please run `galv-harvester setup` wizard."
+        )
 
 
 @click_wrapper.command(
     short_help="Setup the harvester using a setup wizard, envvars, or command-line arguments."
 )
+@click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
 @click.version_option()
-@click.option('--url', type=str, help="API URL to register harvester with.")
-@click.option('--name', type=str, help="Name for the harvester.")
-@click.option('--api_token', type=str, help="Your API token. You must have admin access to at least one Lab.")
-@click.option('--lab_id', type=int,
-              help="Id of the Lab to assign the Harvester to. Only required if you administrate multiple Labs.")
+@click.option("--url", type=str, help="API URL to register harvester with.")
+@click.option("--name", type=str, help="Name for the harvester.")
 @click.option(
-    '--team_id',
+    "--api_token",
+    type=str,
+    help="Your API token. You must have admin access to at least one Lab.",
+)
+@click.option(
+    "--lab_id",
+    type=int,
+    help="Id of the Lab to assign the Harvester to. Only required if you administrate multiple Labs.",
+)
+@click.option(
+    "--team_id",
     type=int,
     help=(
-            "Id of the Team to create a Monitored Path for. "
-            "Only required if you administrate multiple Teams and wish to create a monitored path."
-    )
+        "Id of the Team to create a Monitored Path for. "
+        "Only required if you administrate multiple Teams and wish to create a monitored path."
+    ),
 )
-@click.option('--monitor_path', type=str, help="Path to harvest files from.")
-@click.option('--monitor_path_regex', type=str,
-              help="Regex to match files to harvest. Other options can be specified using the frontend.")
+@click.option("--monitor_path", type=str, help="Path to harvest files from.")
+@click.option(
+    "--monitor_path_regex",
+    type=str,
+    help="Regex to match files to harvest. Other options can be specified using the frontend.",
+)
 def setup(
-        url: str, name: str, api_token: str, lab_id: int, team_id: int,
-        monitor_path: str, monitor_path_regex: str
+    url: str,
+    name: str,
+    api_token: str,
+    lab_id: int,
+    team_id: int,
+    monitor_path: str,
+    monitor_path_regex: str,
 ):
     click.echo("Welcome to Harvester setup.")
     register(
-        url=url, name=name, api_token=api_token, lab_id=lab_id, team_id=team_id,
-        monitor_path=monitor_path, monitor_path_regex=monitor_path_regex
+        url=url,
+        name=name,
+        api_token=api_token,
+        lab_id=lab_id,
+        team_id=team_id,
+        monitor_path=monitor_path,
+        monitor_path_regex=monitor_path_regex,
     )
 
 

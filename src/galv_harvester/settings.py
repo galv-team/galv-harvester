@@ -24,10 +24,16 @@ def get_logger(name):
     # stream_handler = logging.StreamHandler(sys.stdout)
     # stream_handler.setLevel(logging.INFO)
     # logger.addHandler(stream_handler)
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s [%(name)s]', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s %(message)s [%(name)s]", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     os.makedirs(get_logfile().parent, exist_ok=True)
-    file_handler = logging.handlers.RotatingFileHandler(get_logfile(), maxBytes=5_000_000, backupCount=5)
-    file_handler.setLevel(logging.INFO)
+    file_handler = logging.handlers.RotatingFileHandler(
+        get_logfile(), maxBytes=5_000_000, backupCount=5
+    )
+    file_handler.setLevel(
+        logging.INFO if not get_current_context().obj.get("verbose") else logging.DEBUG
+    )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     return logger
