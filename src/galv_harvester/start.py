@@ -2,6 +2,7 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 import json
+import logging
 import os.path
 import re
 import subprocess
@@ -10,10 +11,18 @@ import time
 import click
 import requests
 
+from src.galv_harvester.plugins import get_parsers
+from src.galv_harvester.settings import logger
 from . import run, settings, api
 
 
-def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float = 3.0, **kwargs):
+def query(
+    url: str,
+    data: object = None,
+    retries: int = 5,
+    sleep_seconds: float = 3.0,
+    **kwargs,
+):
     while retries > 0:
         try:
             if data is None:
@@ -34,7 +43,9 @@ def query(url: str, data: object = None, retries: int = 5, sleep_seconds: float 
             if retries == 0:
                 raise e
             else:
-                click.echo(f"Retrying in {sleep_seconds}s ({retries} remaining)", err=True)
+                click.echo(
+                    f"Retrying in {sleep_seconds}s ({retries} remaining)", err=True
+                )
                 time.sleep(sleep_seconds)
 
 
@@ -55,41 +66,56 @@ def get_url() -> str:
 
 
 def create_monitored_path(
-        api_url, api_token, harvester_id, specified,
-        team_id, monitor_path, monitor_path_regex
+    api_url,
+    api_token,
+    harvester_id,
+    specified,
+    team_id,
+    monitor_path,
+    monitor_path_regex,
 ) -> None:
     # TODO: Ensure that the team is a member of the harvester's lab
-    click.echo("The harvester will monitor a path on the server for changes and upload files.")
-    click.echo("You must be a Team administrator to create a monitored path. "
-               "Note that Lab administrators are not necessarily Team administrators.")
+    click.echo(
+        "The harvester will monitor a path on the server for changes and upload files."
+    )
+    click.echo(
+        "You must be a Team administrator to create a monitored path. "
+        "Note that Lab administrators are not necessarily Team administrators."
+    )
 
     def monitored_path_exit(error: str):
-        click.echo('Harvester successfully created, but the monitored path could not be set.')
+        click.echo(
+            "Harvester successfully created, but the monitored path could not be set."
+        )
         click.echo(f"Error: {error}", err=True)
-        click.echo('Please go to the frontend to set a monitored path.')
-        click.echo('')
+        click.echo("Please go to the frontend to set a monitored path.")
+        click.echo("")
 
     # To create monitored paths, we must be a team administrator
     teams_administered = []
     try:
-        teams = query(f"{api_url}teams/", headers={'Authorization': f"Bearer {api_token}"})
-        teams_administered = [t for t in teams['results'] if t['permissions']['write']]
+        teams = query(
+            f"{api_url}teams/", headers={"Authorization": f"Bearer {api_token}"}
+        )
+        teams_administered = [t for t in teams["results"] if t["permissions"]["write"]]
     except BaseException as e:
         return monitored_path_exit(f"Unable to retrieve team list using API key -- {e}")
 
     # Check team okay
-    if team_id is not None and team_id not in [t['id'] for t in teams_administered]:
+    if team_id is not None and team_id not in [t["id"] for t in teams_administered]:
         return monitored_path_exit(f"Team {team_id} is not administered by this user.")
 
     page = 0
     page_size = 10
     while team_id is None:
         if len(teams_administered) == 1:
-            team_id = teams_administered[0]['id']
+            team_id = teams_administered[0]["id"]
             break
         elif specified:
-            return monitored_path_exit('You administrate multiple teams and no team is specified with --team_id.')
-        teams = teams_administered[page:page + page_size]
+            return monitored_path_exit(
+                "You administrate multiple teams and no team is specified with --team_id."
+            )
+        teams = teams_administered[page : page + page_size]
         has_prev = page != 0
         has_next = len(teams_administered) > ((page + 1) * page_size)
         click.echo("Press a number for the Team that will own this Monitored Path.")
@@ -124,13 +150,15 @@ def create_monitored_path(
         except AssertionError:
             click.echo(f"{input_char} is not an available option")
 
-        team_id = teams[input_char]['id']
+        team_id = teams[input_char]["id"]
 
-    team = [t for t in teams_administered if t['id'] == team_id][0]
+    team = [t for t in teams_administered if t["id"] == team_id][0]
 
     # Check path okay
     if monitor_path is None:
-        click.echo("Enter a directory on the server to monitor, or leave blank to skip this step.")
+        click.echo(
+            "Enter a directory on the server to monitor, or leave blank to skip this step."
+        )
         while True:
             monitor_path = input("Path: ")
             if monitor_path == "":
@@ -162,31 +190,37 @@ def create_monitored_path(
             break
 
     if monitor_path is not None:
-        regex_str = f" with regex {monitor_path_regex}" if monitor_path_regex is not None else ""
+        regex_str = (
+            f" with regex {monitor_path_regex}"
+            if monitor_path_regex is not None
+            else ""
+        )
         click.echo(f"Setting monitor path to {monitor_path}{regex_str}")
         try:
             query(
                 f"{api_url}monitored_paths/",
                 {
-                    'path': monitor_path,
-                    'regex': monitor_path_regex,
-                    'harvester': harvester_id,
-                    'team': team['id'],
-                    'active': True
+                    "path": monitor_path,
+                    "regex": monitor_path_regex,
+                    "harvester": harvester_id,
+                    "team": team["id"],
+                    "active": True,
                 },
-                headers={
-                    'Authorization': f"Bearer {api_token}"
-                },
+                headers={"Authorization": f"Bearer {api_token}"},
             )
         except BaseException as e:
             return monitored_path_exit(f"Unable to set monitored path -- {e}")
 
 
 def register(
-        url: str = None, name: str = None, api_token: str = None,
-        lab_id: int = None, team_id: int = None,
-        monitor_path: str = None, monitor_path_regex: str = ".*",
-        foreground: bool = None
+    url: str = None,
+    name: str = None,
+    api_token: str = None,
+    lab_id: int = None,
+    team_id: int = None,
+    monitor_path: str = None,
+    monitor_path_regex: str = ".*",
+    foreground: bool = None,
 ):
     """
     Guide a user through the setup process.
@@ -194,12 +228,12 @@ def register(
     Specifying any of the config args (url, name, api_token, lab_id, monitor_path, monitor_path_regex) function avoid all calls to input() making it non-interactive.
     """
     specified = (
-            url is not None or
-            name is not None or
-            api_token is not None or
-            lab_id is not None or
-            monitor_path is not None or
-            os.getenv("GALV_HARVESTER_SKIP_WIZARD", False)
+        url is not None
+        or name is not None
+        or api_token is not None
+        or lab_id is not None
+        or monitor_path is not None
+        or os.getenv("GALV_HARVESTER_SKIP_WIZARD", False)
     )
     # Load from environment variables if not specified
     url = url or os.getenv("GALV_HARVESTER_SERVER_URL")
@@ -208,7 +242,9 @@ def register(
     lab_id = lab_id or os.getenv("GALV_HARVESTER_LAB_ID")
     team_id = team_id or os.getenv("GALV_HARVESTER_TEAM_ID")
     monitor_path = monitor_path or os.getenv("GALV_HARVESTER_MONITOR_PATH")
-    monitor_path_regex = monitor_path_regex or os.getenv("GALV_HARVESTER_MONITOR_PATH_REGEX")
+    monitor_path_regex = monitor_path_regex or os.getenv(
+        "GALV_HARVESTER_MONITOR_PATH_REGEX"
+    )
     foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", False)
 
     # Check we can connect to the API
@@ -231,21 +267,28 @@ def register(
         if not specified:
             api_token = input("Enter your API token: ")
         try:
-            labs = query(f"{url}labs/", headers={'Authorization': f"Bearer {api_token}"})
-            labs_administered = [l for l in labs['results'] if l['permissions']['write']]
+            labs = query(
+                f"{url}labs/", headers={"Authorization": f"Bearer {api_token}"}
+            )
+            labs_administered = [
+                l for l in labs["results"] if l["permissions"]["write"]
+            ]
         except BaseException as e:
             click.echo(f"Unable to retrieve lab list using API key -- {e}", err=True)
             if specified:
                 exit(1)
         if len(labs_administered) == 0:
-            click.echo("This user does not administer any labs. Please try an API key from a different user.", err=True)
+            click.echo(
+                "This user does not administer any labs. Please try an API key from a different user.",
+                err=True,
+            )
             if specified:
                 exit(1)
             continue
         break
 
     # Check lab okay
-    if lab_id is not None and lab_id not in [l['id'] for l in labs_administered]:
+    if lab_id is not None and lab_id not in [l["id"] for l in labs_administered]:
         click.echo(f"Lab {lab_id} is not administered by this user.", err=True)
         exit(1)
 
@@ -253,12 +296,15 @@ def register(
     page_size = 10
     while lab_id is None:
         if len(labs_administered) == 1:
-            lab_id = labs_administered[0]['id']
+            lab_id = labs_administered[0]["id"]
             break
         elif specified:
-            click.echo('You administrate multiple labs. Please specify a lab using --lab_id.', err=True)
+            click.echo(
+                "You administrate multiple labs. Please specify a lab using --lab_id.",
+                err=True,
+            )
             exit(1)
-        labs = labs_administered[page:page + page_size]
+        labs = labs_administered[page : page + page_size]
         has_prev = page != 0
         has_next = len(labs_administered) > ((page + 1) * page_size)
         click.echo("Press a number for the Lab that will own this Harvester.")
@@ -293,9 +339,9 @@ def register(
         except AssertionError:
             click.echo(f"{input_char} is not an available option")
 
-        lab_id = labs[input_char]['id']
+        lab_id = labs[input_char]["id"]
 
-    lab = [l for l in labs_administered if l['id'] == lab_id][0]
+    lab = [l for l in labs_administered if l["id"] == lab_id][0]
 
     # Check name okay
     if name is None:
@@ -307,7 +353,7 @@ def register(
             continue
         result = query(f"{url}harvesters/?name={name}&lab__id={lab_id}")
 
-        if result['count'] > 0:
+        if result["count"] > 0:
             click.echo(f"This Lab already has a harvester called {name}.", err=True)
             if specified:
                 exit(1)
@@ -320,13 +366,13 @@ def register(
     click.echo(f"Registering new harvester {name} to Lab {lab['name']}")
     result = query(
         f"{url}harvesters/",
-        {'lab': lab['url'], 'name': name},
-        headers={'Authorization': f"Bearer {api_token}"}
+        {"lab": lab["url"], "name": name},
+        headers={"Authorization": f"Bearer {api_token}"},
     )
 
     # Save credentials
     file_name = settings.get_settings_file()
-    with open(file_name, 'w+') as f:
+    with open(file_name, "w+") as f:
         json.dump(result, f)
         click.echo("Details:")
         click.echo(json.dumps(result))
@@ -337,8 +383,13 @@ def register(
 
     if monitor_path is not None or not specified:
         create_monitored_path(
-            api_url=url, api_token=api_token, harvester_id=result['id'], specified=specified,
-            team_id=team_id, monitor_path=monitor_path, monitor_path_regex=monitor_path_regex
+            api_url=url,
+            api_token=api_token,
+            harvester_id=result["id"],
+            specified=specified,
+            team_id=team_id,
+            monitor_path=monitor_path,
+            monitor_path_regex=monitor_path_regex,
         )
 
     click.echo(
@@ -371,10 +422,11 @@ PATHS: Files/Directories to harvest files from. If left blank, all Monitored Pat
 )
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
 @click.argument("paths", type=str, nargs=-1, required=False)
-def harvest(paths):
+def harvest(verbose: bool, paths):
     # Check we can access settings
     try:
         settings.get_settings()
+        logger.setLevel(logging.DEBUG if verbose else logging.INFO)
         sync()
         current_settings = settings.get_settings()
     except FileNotFoundError:
@@ -390,15 +442,18 @@ def harvest(paths):
                 click.echo(f"Path {path} does not exist on the filesystem.")
                 exit(1)
             # Check the path is on a monitored path
-            monitored_paths = current_settings.get('monitored_paths', [])
+            monitored_paths = current_settings.get("monitored_paths", [])
             monitored_path = None
             for mp in monitored_paths:
                 # A match is where the path is a substring of the monitored path
-                if not path.lower().startswith(mp['path'].lower()):
+                if not path.lower().startswith(mp["path"].lower()):
                     continue
                 # and the regex matches (for files)
                 if os.path.isfile(path):
-                    if re.search(mp['regex'], os.path.relpath(path, mp['path'])) is not None:
+                    if (
+                        re.search(mp["regex"], os.path.relpath(path, mp["path"]))
+                        is not None
+                    ):
                         monitored_path = mp
                         break
                 elif os.path.isdir(path):
@@ -434,11 +489,12 @@ def harvest(paths):
         "(will not close the thread, useful for Dockerized application)."
     ),
 )
-def start(foreground: bool):
+def start(verbose: bool, foreground: bool):
     foreground = foreground or os.getenv("GALV_HARVESTER_FOREGROUND", True)
     click.echo("Attempting to start harvester.")
     # Check whether a config file already exists, if so, use it
     current_settings = settings.get_settings()
+    logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     if current_settings:
         sync()
         click.echo(
@@ -487,6 +543,7 @@ def start(foreground: bool):
     help="Regex to match files to harvest. Other options can be specified using the frontend.",
 )
 def setup(
+    verbose: bool,
     url: str,
     name: str,
     api_token: str,
@@ -496,6 +553,7 @@ def setup(
     monitor_path_regex: str,
 ):
     click.echo("Welcome to Harvester setup.")
+    logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     register(
         url=url,
         name=name,

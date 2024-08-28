@@ -7,7 +7,13 @@ import json
 from . import settings
 from .utils import NpEncoder
 import requests
-from .settings import get_setting, get_settings, get_settings_file, get_logger, update_envvars
+from .settings import (
+    get_setting,
+    get_settings,
+    get_settings_file,
+    get_logger,
+    update_envvars,
+)
 import time
 
 logger = get_logger(__file__)
@@ -18,29 +24,30 @@ class StorageError(RuntimeError):
 
 
 def report_harvest_result(
-        path,
-        monitored_path_id: str,
-        content=None,
-        error: BaseException = None,
-        **kwargs  # passed to requests.post
+    path,
+    monitored_path_id: str,
+    content=None,
+    error: BaseException = None,
+    **kwargs,  # passed to requests.post
 ):
     start = time.time()
     try:
         if error is not None:
-            data = {'status': settings.HARVESTER_STATUS_ERROR, 'error': f"{error.__class__.__name__}: {error}"}
+            data = {
+                "status": settings.HARVESTER_STATUS_ERROR,
+                "error": f"{error.__class__.__name__}: {error}",
+            }
         else:
-            data = {'status': settings.HARVESTER_STATUS_SUCCESS, 'content': content}
-        data['path'] = path
-        data['monitored_path_id'] = monitored_path_id
+            data = {"status": settings.HARVESTER_STATUS_SUCCESS, "content": content}
+        data["path"] = path
+        data["monitored_path_id"] = monitored_path_id
         logger.debug(f"{get_setting('url')}report/; {json.dumps(data, cls=NpEncoder)}")
         out = requests.post(
             f"{get_setting('url')}report/",
-            headers={
-                'Authorization': f"Harvester {get_setting('api_key')}"
-            },
+            headers={"Authorization": f"Harvester {get_setting('api_key')}"},
             # encode then decode to ensure np values are converted to standard types and null bytes are removed
-            json=json.loads(json.dumps(data, cls=NpEncoder).replace('\\u0000', '')),
-            **kwargs
+            json=json.loads(json.dumps(data, cls=NpEncoder).replace("\\u0000", "")),
+            **kwargs,
         )
         try:
             out.json()
@@ -48,12 +55,16 @@ def report_harvest_result(
             error_text = out.text[:100].replace("\n", "\\n")
             if len(out.text) > 100:
                 error_text += "..."
-            logger.error(f"Server returned invalid JSON (HTTP {out.status_code}): {error_text}")
+            logger.error(
+                f"Server returned invalid JSON (HTTP {out.status_code}): {error_text}"
+            )
             return None
         if not out.ok:
             if out.status_code == 507:
                 raise StorageError(out.json())
-            logger.error(f"Server returned error (HTTP {out.status_code}): {out.json()}")
+            logger.error(
+                f"Server returned error (HTTP {out.status_code}): {out.json()}"
+            )
             return None
     except StorageError as e:
         raise e
@@ -67,9 +78,11 @@ def report_harvest_result(
 def update_config():
     logger.info("Updating configuration from API")
     try:
-        url = get_setting('url')
-        key = get_setting('api_key')
-        result = requests.get(f"{url}config/", headers={'Authorization': f"Harvester {key}"})
+        url = get_setting("url")
+        key = get_setting("api_key")
+        result = requests.get(
+            f"{url}config/", headers={"Authorization": f"Harvester {key}"}
+        )
         if result.status_code == 200:
             dirty = False
             new = result.json()
@@ -79,7 +92,9 @@ def update_config():
             all_keys = [*new.keys(), *old.keys()]
             for key in all_keys:
                 if key in old.keys() and key in new.keys():
-                    if json.dumps(old[key], cls=NpEncoder) == json.dumps(new[key], cls=NpEncoder):
+                    if json.dumps(old[key], cls=NpEncoder) == json.dumps(
+                        new[key], cls=NpEncoder
+                    ):
                         continue
                     logger.info(f"Updating value for setting '{key}'")
                     logger.info(f"Old value: {json.dumps(old[key], cls=NpEncoder)}")
@@ -97,10 +112,12 @@ def update_config():
                     dirty = True
 
             if dirty:
-                with open(get_settings_file(), 'w+') as f:
+                with open(get_settings_file(), "w+") as f:
                     json.dump(result.json(), f)
                 update_envvars()
         else:
-            logger.error(f"Unable to fetch {url}config/ -- received HTTP {result.status_code}")
+            logger.error(
+                f"Unable to fetch {url}config/ -- received HTTP {result.status_code}"
+            )
     except BaseException as e:
         logger.error(f"{e.__class__.__name__}: {e}")

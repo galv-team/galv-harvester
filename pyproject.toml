@@ -44,9 +44,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/unknown/galv-harvester#readme"
-Issues = "https://github.com/unknown/galv-harvester/issues"
-Source = "https://github.com/unknown/galv-harvester"
+Documentation = "https://github.com/galv-team/galv-harvester#readme"
+Issues = "https://github.com/galv-team/galv-harvester/issues"
+Source = "https://github.com/galv-team/galv-harvester"
 
 [project.scripts]
 galv-harvester = "galv_harvester.start:click_wrapper"

@@ -9,7 +9,7 @@ from .input_file import InputFile
 
 class DelimitedInputFile(InputFile):
     """
-        A class for handling input files delimited by a character
+    A class for handling input files delimited by a character
     """
 
     @staticmethod
@@ -34,7 +34,7 @@ class DelimitedInputFile(InputFile):
 
         :raises UnsupportedFileTypeError: if the file is not a supported type
         """
-        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
+        with open(file_path, newline="", encoding="utf-8-sig") as csvfile:
             try:
                 csvfile.readline()
             except UnicodeDecodeError as e:
@@ -69,15 +69,19 @@ class DelimitedInputFile(InputFile):
                     # Move to the next line and try again
                     last_line += 1
                     if last_line > max_header_lines:
-                        raise UnsupportedFileTypeError((
-                            f"Could not determine delimiter and header status after {max_header_lines} lines."
-                        ))
+                        raise UnsupportedFileTypeError(
+                            (
+                                f"Could not determine delimiter and header status after {max_header_lines} lines."
+                            )
+                        )
                     continue
 
                 try:
                     csvfile.seek(0)
                     if last_line > 0:
-                        self.preamble = "".join([csvfile.readline() for _ in range(last_line)])
+                        self.preamble = "".join(
+                            [csvfile.readline() for _ in range(last_line)]
+                        )
                         self.data_start = last_line
                     else:
                         self.preamble = None
@@ -89,10 +93,12 @@ class DelimitedInputFile(InputFile):
                         self.header = [f"column_{i}" for i in range(len(next(reader)))]
                     break
                 except Exception as e:
-                    raise UnsupportedFileTypeError((
-                        f"Identified delimiter [{self.dialect.delimiter}] after {last_line} lines,"
-                        f" but could not use `next(reader)`."
-                    )) from e
+                    raise UnsupportedFileTypeError(
+                        (
+                            f"Identified delimiter [{self.dialect.delimiter}] after {last_line} lines,"
+                            f" but could not use `next(reader)`."
+                        )
+                    ) from e
 
         super().__init__(file_path, **kwargs)
         self.logger.info(f"Type is Delimited [{self.dialect.delimiter}]")
@@ -108,13 +114,16 @@ class DelimitedInputFile(InputFile):
 
         column_names = [self.header[i] for i in column_numbers]
 
-        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
+        with open(file_path, newline="", encoding="utf-8-sig") as csvfile:
             self.spin_to_line(csvfile, self.data_start)
             reader = csv.reader(csvfile, dialect=self.dialect)
             if self.has_header:
                 next(reader)
             for row in reader:
-                yield { column_names[n]: row[column_numbers[n]] for n in range(len(column_names)) }
+                yield {
+                    column_names[n]: row[column_numbers[n]]
+                    for n in range(len(column_names))
+                }
 
     def get_data_labels(self):
         yield None
@@ -124,6 +133,6 @@ class DelimitedInputFile(InputFile):
         metadata = {
             "preamble": self.preamble,
         }
-        columns_with_data = { name: { "has_data": True } for name in self.header }
+        columns_with_data = {name: {"has_data": True} for name in self.header}
 
         return metadata, columns_with_data

@@ -12,12 +12,12 @@ from .exceptions import (
     InvalidDataInFileError,
 )
 
-IDF_HEADER = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfb\x00\x00\x00\r\x00Version=11'
+IDF_HEADER = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfb\x00\x00\x00\r\x00Version=11"
 
 
 class IviumInputFile(InputFile):
     """
-        A class for handling input files
+    A class for handling input files
     """
 
     def __init__(self, file_path, **kwargs):
@@ -27,7 +27,7 @@ class IviumInputFile(InputFile):
 
     def load_data(self, file_path, columns):
         """
-            Load data in a ivium text file"
+        Load data in a ivium text file"
         """
 
         with open(file_path, "rb") as f:
@@ -44,14 +44,14 @@ class IviumInputFile(InputFile):
                 while current_line != sample_row:
                     line = f.readline()
                     current_line += 1
-                line = line.decode('ascii')
+                line = line.decode("ascii")
 
                 if len(line) != 40:
                     self.logger.debug(line)
                     raise InvalidDataInFileError(
-                        (
-                            "Incorrect line length on line {} was {} expected {}"
-                        ).format(current_line, len(line), 40)
+                        ("Incorrect line length on line {} was {} expected {}").format(
+                            current_line, len(line), 40
+                        )
                     )
                 row = [line[:12].strip(), line[13:25].strip(), line[26:].strip()]
                 yield {
@@ -61,38 +61,38 @@ class IviumInputFile(InputFile):
 
     def _get_end_task_function(self, task):
         def duration(row):
-            return row['test_time'] > task['Duration']
+            return row["test_time"] > task["Duration"]
 
         def E_greater_than(row):
-            return row['volts'] > task['E>']
+            return row["volts"] > task["E>"]
 
         def E_less_than(row):
-            return row['volts'] < task['E<']
+            return row["volts"] < task["E<"]
 
         def I_greater_than(row):
-            return row['amps'] > task['I<']
+            return row["amps"] > task["I<"]
 
         def I_less_than(row):
-            return row['amps'] < task['I<']
+            return row["amps"] < task["I<"]
 
         end_funcs = []
-        for end_key in ['End1', 'End2', 'End3', 'End4']:
+        for end_key in ["End1", "End2", "End3", "End4"]:
             end = task[end_key]
-            if end == 'Duration':
+            if end == "Duration":
                 end_funcs.append(duration)
-            elif end == 'E>':
+            elif end == "E>":
                 end_funcs.append(E_greater_than)
-            elif end == 'E<':
+            elif end == "E<":
                 end_funcs.append(E_less_than)
-            elif end == 'I>':
+            elif end == "I>":
                 end_funcs.append(I_greater_than)
-            elif end == 'I<':
+            elif end == "I<":
                 end_funcs.append(I_less_than)
-            elif end == 'select':
+            elif end == "select":
                 continue
             else:
                 raise UnsupportedFileTypeError(
-                    'task end condition {} unknown'.format(end)
+                    "task end condition {} unknown".format(end)
                 )
 
         def is_end_task(row):
@@ -106,7 +106,7 @@ class IviumInputFile(InputFile):
     def get_data_labels(self):
         column_names = ["test_time", "amps", "volts"]
         task_index = 0
-        current_task = self._file_metadata['Tasks'][task_index]
+        current_task = self._file_metadata["Tasks"][task_index]
         is_end_task = self._get_end_task_function(current_task)
         start_task_row = 0
         end_task_row = 0
@@ -139,13 +139,15 @@ class IviumInputFile(InputFile):
                     experiment_label = ""
 
                 yield (
-                    f"task_{task_index}_{mode}", (start_task_row, end_task_row), experiment_label
+                    f"task_{task_index}_{mode}",
+                    (start_task_row, end_task_row),
+                    experiment_label,
                 )
 
                 prev_time = time
                 task_index += 1
-                if task_index < len(self._file_metadata['Tasks']):
-                    current_task = self._file_metadata['Tasks'][task_index]
+                if task_index < len(self._file_metadata["Tasks"]):
+                    current_task = self._file_metadata["Tasks"][task_index]
                     is_end_task = self._get_end_task_function(current_task)
                     start_task_row = end_task_row
                 else:
@@ -153,9 +155,10 @@ class IviumInputFile(InputFile):
 
     def _load_ivium_metadata(self):
         file_path = self.file_path
-        regex_key_array = re.compile(r'([^,\[]+)\[([0-9]+)\]$')
+        regex_key_array = re.compile(r"([^,\[]+)\[([0-9]+)\]$")
         match_sci_notation = re.compile(
-            r'[+\-]?(?:0|[1-9]\d*)(?:\.\d*)?(?:[eE][+\-]?\d+)?')
+            r"[+\-]?(?:0|[1-9]\d*)(?:\.\d*)?(?:[eE][+\-]?\d+)?"
+        )
         with open(file_path, "rb") as f:
             # header
             line = f.readline()
@@ -164,14 +167,14 @@ class IviumInputFile(InputFile):
 
             while True:
                 samples_start += 1
-                line = f.readline().decode('ascii', errors='replace')
-                line = line.replace('\n', '').replace('\r', '')
-                key_value = line.split('=')
+                line = f.readline().decode("ascii", errors="replace")
+                line = line.replace("\n", "").replace("\r", "")
+                key_value = line.split("=")
                 if len(key_value) > 1:
-                    keys = key_value[0].split('.')
+                    keys = key_value[0].split(".")
                     if len(keys) == 1:
-                        if keys[0] == 'Tasks':
-                            ivium_metadata['Tasks'] = [
+                        if keys[0] == "Tasks":
+                            ivium_metadata["Tasks"] = [
                                 {} for i in range(int(key_value[1]))
                             ]
                         elif key_value[1]:
@@ -182,11 +185,11 @@ class IviumInputFile(InputFile):
                     elif len(keys) == 2:
                         base_metadata = ivium_metadata[keys[0]]
 
-                        if keys[0] == 'Tasks':
+                        if keys[0] == "Tasks":
                             array_index_match = regex_key_array.search(keys[1])
                             if not array_index_match:
                                 raise UnsupportedFileTypeError(
-                                    'Tasks entry should be a list:', keys[1]
+                                    "Tasks entry should be a list:", keys[1]
                                 )
                             key = array_index_match.group(1)
                             index = int(array_index_match.group(2)) - 1
@@ -194,11 +197,11 @@ class IviumInputFile(InputFile):
                                 base_metadata[index][key] = key_value[1]
                             else:
                                 raise UnsupportedFileTypeError(
-                                    'unexpected array index {} for line {}'.format(
+                                    "unexpected array index {} for line {}".format(
                                         index, line
-                                    ))
-                        elif keys[0] == 'Data Options' \
-                                and keys[1] == 'AnalogInputData':
+                                    )
+                                )
+                        elif keys[0] == "Data Options" and keys[1] == "AnalogInputData":
                             base_metadata[keys[1]] = [
                                 {} for i in range(int(key_value[1]))
                             ]
@@ -211,36 +214,32 @@ class IviumInputFile(InputFile):
                     elif len(keys) == 3:
 
                         base_metadata = ivium_metadata[keys[0]][keys[1]]
-                        if keys[0] == 'Data Options' \
-                                and keys[1] == 'AnalogInputData':
+                        if keys[0] == "Data Options" and keys[1] == "AnalogInputData":
                             array_index_match = regex_key_array.search(keys[2])
                             if not array_index_match:
                                 raise UnsupportedFileTypeError(
-                                    'Data Options.AnalogInputData entry should be a list:', keys[2]
+                                    "Data Options.AnalogInputData entry should be a list:",
+                                    keys[2],
                                 )
                             key = array_index_match.group(1)
                             index = int(array_index_match.group(2)) - 1
                             if index < len(base_metadata):
                                 base_metadata[index][key] = key_value[1]
                     else:
-                        raise UnsupportedFileTypeError(
-                            'found unexpected # of keys'
-                        )
+                        raise UnsupportedFileTypeError("found unexpected # of keys")
 
                 else:
                     # check if we've parsed the file ok
-                    if not 'Mconfig' in ivium_metadata:
-                        raise UnsupportedFileTypeError(
-                            'found unexpected line', line
-                        )
+                    if not "Mconfig" in ivium_metadata:
+                        raise UnsupportedFileTypeError("found unexpected line", line)
                     # looks ok, check samples start where we expect them to
                     for i in range(4):
-                        line = f.readline().decode('ascii', errors='replace')
-                        line = line.replace('\n', '').replace('\r', '')
+                        line = f.readline().decode("ascii", errors="replace")
+                        line = line.replace("\n", "").replace("\r", "")
                         samples_start += 1
                     if len(match_sci_notation.findall(line)) != 3:
                         raise UnsupportedFileTypeError(
-                            'cannot find samples start', line
+                            "cannot find samples start", line
                         )
                     # everything looks good, so we can terminate the loop
                     break
@@ -252,7 +251,7 @@ class IviumInputFile(InputFile):
                 line = f.readline()
                 line_no += 1
                 if line:
-                    line = line.decode('ascii', errors='replace')
+                    line = line.decode("ascii", errors="replace")
                     if len(match_sci_notation.findall(line)) == 3:
                         sample_rows.append(line_no)
                 else:
@@ -262,7 +261,7 @@ class IviumInputFile(InputFile):
 
     def load_metadata(self):
         """
-            Load metadata in a ivium_text file"
+        Load metadata in a ivium_text file"
         """
         self._sample_rows, self._file_metadata = self._load_ivium_metadata()
 
@@ -272,24 +271,23 @@ class IviumInputFile(InputFile):
         metadata["Machine Type"] = "Ivium"
         metadata["Dataset Name"] = os.path.splitext(ntpath.basename(file_path))[0]
         metadata["Date of Test"] = datetime.strptime(
-            self._file_metadata['starttime'],
-            r'%d/%m/%Y %H:%M:%S'
+            self._file_metadata["starttime"], r"%d/%m/%Y %H:%M:%S"
         )
         columns_with_data = {
-            'amps': {
-                'has_data': True,
-                'is_numeric': True,
-                'unit': 'A',
+            "amps": {
+                "has_data": True,
+                "is_numeric": True,
+                "unit": "A",
             },
-            'volts': {
-                'has_data': True,
-                'is_numeric': True,
-                'unit': 'V',
+            "volts": {
+                "has_data": True,
+                "is_numeric": True,
+                "unit": "V",
             },
-            'test_time': {
-                'has_data': True,
-                'is_numeric': True,
-                'unit': 's',
+            "test_time": {
+                "has_data": True,
+                "is_numeric": True,
+                "unit": "s",
             },
         }
 
@@ -309,6 +307,4 @@ class IviumInputFile(InputFile):
         with open(file_path, "rb") as f:
             line = f.readline()
             if not line.startswith(IDF_HEADER):
-                raise UnsupportedFileTypeError(
-                    'incorrect header - {}'.format(line)
-                )
+                raise UnsupportedFileTypeError("incorrect header - {}".format(line))

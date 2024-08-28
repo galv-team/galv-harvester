@@ -11,7 +11,7 @@ from .input_file import InputFile
 
 class BiologicMprInputFile(InputFile):
     """
-        A class for handling input files
+    A class for handling input files
     """
 
     def __init__(self, file_path, **kwargs):
@@ -29,29 +29,32 @@ class BiologicMprInputFile(InputFile):
                 columns_of_interest.append(col_idx)
         for row in self.mpr_file.data:
             yield {
-                column_names[col_idx]: row[col_idx]
-                for col_idx in columns_of_interest
+                column_names[col_idx]: row[col_idx] for col_idx in columns_of_interest
             }
 
     def get_data_labels(self):
-        modes = self.mpr_file.get_flag('mode')
-        Ns_changes = self.mpr_file.get_flag('Ns changes')
-        Ns_index = self.mpr_file.data.dtype.names.index('Ns')
+        modes = self.mpr_file.get_flag("mode")
+        Ns_changes = self.mpr_file.get_flag("Ns changes")
+        Ns_index = self.mpr_file.data.dtype.names.index("Ns")
         mode_labels = {
-            1: 'CC',
-            2: 'CV',
-            3: 'Rest',
+            1: "CC",
+            2: "CV",
+            3: "Rest",
         }
         last_Ns_change = 1
 
         column_names = self.mpr_file.data.dtype.names
-        time_col = next((i for i, c in enumerate(column_names) if c.startswith("time")), 3)
-        cont_col = next((i for i, c in enumerate(column_names) if c.startswith("control")), 4)
+        time_col = next(
+            (i for i, c in enumerate(column_names) if c.startswith("time")), 3
+        )
+        cont_col = next(
+            (i for i, c in enumerate(column_names) if c.startswith("control")), 4
+        )
         prev_time = 0
 
         for i in range(len(self.mpr_file.data)):
-            last_mode = modes[i-1]
-            last_Ns = self.mpr_file.data[i-1][Ns_index]
+            last_mode = modes[i - 1]
+            last_Ns = self.mpr_file.data[i - 1][Ns_index]
             Ns_change = Ns_changes[i]
             if Ns_change:
                 time = self.mpr_file.data[i][time_col]
@@ -66,16 +69,22 @@ class BiologicMprInputFile(InputFile):
                         experiment_label = "Discharge "
 
                     is_const_curr = mode_label.casefold() == "cc"
-                    experiment_label += f"at {control} {'mA' if is_const_curr else 'V'} "
+                    experiment_label += (
+                        f"at {control} {'mA' if is_const_curr else 'V'} "
+                    )
                 experiment_label += f"for {time - prev_time} seconds"
 
                 if last_mode in mode_labels:
                     data_label = (
-                        f"Ns_{last_Ns}_{mode_label}", (last_Ns_change, i - 1), experiment_label
+                        f"Ns_{last_Ns}_{mode_label}",
+                        (last_Ns_change, i - 1),
+                        experiment_label,
                     )
                 else:
                     data_label = (
-                        f"Ns_{last_Ns}", (last_Ns_change, i - 1), experiment_label
+                        f"Ns_{last_Ns}",
+                        (last_Ns_change, i - 1),
+                        experiment_label,
                     )
 
                 last_Ns_change = i
@@ -88,7 +97,7 @@ class BiologicMprInputFile(InputFile):
         metadata = {
             "Machine Type": "BioLogic",
             "Dataset Name": os.path.splitext(ntpath.basename(file_path))[0],
-            "Date of Test": self.mpr_file.startdate
+            "Date of Test": self.mpr_file.startdate,
         }
 
         columns_with_data = {

@@ -2,9 +2,10 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
+
 class UnsupportedFileTypeError(Exception):
     """
-        Exception indicating the file is unsupported
+    Exception indicating the file is unsupported
     """
 
     pass
@@ -12,7 +13,7 @@ class UnsupportedFileTypeError(Exception):
 
 class InvalidDataInFileError(Exception):
     """
-        Exception indicating the file has invalid data
+    Exception indicating the file has invalid data
     """
 
     pass
@@ -20,7 +21,7 @@ class InvalidDataInFileError(Exception):
 
 class EmptyFileError(Exception):
     """
-        Exception indicating the file has no data
+    Exception indicating the file has no data
     """
 
     pass

@@ -31,20 +31,22 @@ from .parse.delimited_input_file import DelimitedInputFile
 from .api import report_harvest_result, StorageError
 
 from .__about__ import VERSION
+from .plugins import get_parsers
 
 logger = settings.get_logger(__file__)
 
 
 class HarvestProcessor:
-    registered_input_files = [
+    default_parsers = [
         BiologicMprInputFile,
         IviumInputFile,
         MaccorInputFile,
         MaccorExcelInputFile,
         MaccorRawInputFile,
         ArbinCSVFile,
-        DelimitedInputFile  # Should be last because it processes files line by line and accepts anything table-like
+        DelimitedInputFile,  # Should be last because it processes files line by line and accepts anything table-like
     ]
+    parser_errors = {}
 
     @staticmethod
     def check_response(step: str, response):
@@ -62,20 +64,24 @@ class HarvestProcessor:
         self.mapping = None
         self.file_path = file_path
         self.monitored_path = monitored_path
-        for input_file_cls in self.registered_input_files:
+        self.parser_classes = [*get_parsers(), *self.default_parsers]
+        for input_file_cls in self.default_parsers:
             try:
-                logger.debug('Tried input reader {}'.format(input_file_cls))
+                logger.debug("Tried input reader {}".format(input_file_cls))
                 input_file = input_file_cls(file_path=file_path)
             except UnsupportedFileTypeError as e:
-                logger.debug('...failed with: ', type(e), e)
+                self.parser_errors[input_file_cls.__name__] = e
+                logger.debug("...failed with: ", type(e), e)
                 continue
             except Exception as e:
-                logger.error((
-                    f"{input_file_cls.__name__} failed to import"
-                    f" {file_path} with non-UnsupportedFileTypeError: {e}"
-                ))
+                logger.error(
+                    (
+                        f"{input_file_cls.__name__} failed to import"
+                        f" {file_path} with non-UnsupportedFileTypeError: {e}"
+                    )
+                )
                 continue
-            logger.debug('...succeeded...')
+            logger.debug("...succeeded...")
             self.input_file = input_file
             self.parser = input_file_cls
             return
@@ -102,7 +108,7 @@ class HarvestProcessor:
         """
         Get the test date from the metadata
         """
-        return HarvestProcessor.serialize_datetime(metadata.get('Date of Test'))
+        return HarvestProcessor.serialize_datetime(metadata.get("Date of Test"))
 
     def harvest(self):
         """
@@ -112,14 +118,20 @@ class HarvestProcessor:
             metadata_time = time.time()
             self._report_file_metadata()
             column_time = time.time()
-            logger.info(f"Metadata reported in {column_time - metadata_time:.2f} seconds")
+            logger.info(
+                f"Metadata reported in {column_time - metadata_time:.2f} seconds"
+            )
             self._report_summary()
             if self.mapping is not None:
                 data_prep_time = time.time()
-                logger.info(f"Column metadata reported in {data_prep_time - column_time:.2f} seconds")
+                logger.info(
+                    f"Column metadata reported in {data_prep_time - column_time:.2f} seconds"
+                )
                 self._prepare_data()
                 upload_time = time.time()
-                logger.info(f"Data prepared in {upload_time - data_prep_time:.2f} seconds")
+                logger.info(
+                    f"Data prepared in {upload_time - data_prep_time:.2f} seconds"
+                )
                 self._upload_data()
                 logger.info(f"Data uploaded in {time.time() - upload_time:.2f} seconds")
                 self._delete_temp_files()
@@ -133,17 +145,19 @@ class HarvestProcessor:
         core_metadata, extra_metadata = self.input_file.load_metadata()
         report = report_harvest_result(
             path=self.file_path,
-            monitored_path_id=self.monitored_path.get('id'),
+            monitored_path_id=self.monitored_path.get("id"),
             content={
-                'task': settings.HARVESTER_TASK_IMPORT,
-                'stage': settings.HARVEST_STAGE_FILE_METADATA,
-                'data': {
-                    'core_metadata': HarvestProcessor.serialize_datetime(core_metadata),
-                    'extra_metadata': HarvestProcessor.serialize_datetime(extra_metadata),
-                    'test_date': HarvestProcessor.get_test_date(core_metadata),
-                    'parser': self.input_file.__class__.__name__
-                }
-            }
+                "task": settings.HARVESTER_TASK_IMPORT,
+                "stage": settings.HARVEST_STAGE_FILE_METADATA,
+                "data": {
+                    "core_metadata": HarvestProcessor.serialize_datetime(core_metadata),
+                    "extra_metadata": HarvestProcessor.serialize_datetime(
+                        extra_metadata
+                    ),
+                    "test_date": HarvestProcessor.get_test_date(core_metadata),
+                    "parser": self.input_file.__class__.__name__,
+                },
+            },
         )
         HarvestProcessor.check_response("Report Metadata", report)
 
@@ -156,7 +170,11 @@ class HarvestProcessor:
         summary_data = []
         iterator = self.input_file.load_data(
             self.file_path,
-            [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
+            [
+                c
+                for c in self.input_file.column_info.keys()
+                if self.input_file.column_info[c].get("has_data")
+            ],
         )
         for row in iterator:
             summary_data.append(row)
@@ -168,28 +186,32 @@ class HarvestProcessor:
         # Upload results
         report = report_harvest_result(
             path=self.file_path,
-            monitored_path_id=self.monitored_path.get('id'),
+            monitored_path_id=self.monitored_path.get("id"),
             content={
-                'task': settings.HARVESTER_TASK_IMPORT,
-                'stage': settings.HARVEST_STAGE_DATA_SUMMARY,
-                'data': summary.to_json()
-            }
+                "task": settings.HARVESTER_TASK_IMPORT,
+                "stage": settings.HARVEST_STAGE_DATA_SUMMARY,
+                "data": summary.to_json(),
+            },
         )
         HarvestProcessor.check_response("Report Column Metadata", report)
 
-        mapping_url = report.json()['mapping']
+        mapping_url = report.json()["mapping"]
         if mapping_url is None:
-            logger.info("Mapping could not be automatically determined. Will revisit when user determines mapping.")
+            logger.info(
+                "Mapping could not be automatically determined. Will revisit when user determines mapping."
+            )
             return
         mapping_request = requests.get(
             mapping_url,
-            headers={'Authorization': f"Harvester {settings.get_setting('api_key')}"}
+            headers={"Authorization": f"Harvester {settings.get_setting('api_key')}"},
         )
         HarvestProcessor.check_response("Get Mapping", mapping_request)
-        self.mapping = mapping_request.json().get('rendered_map')
+        self.mapping = mapping_request.json().get("rendered_map")
         if not isinstance(self.mapping, dict):
             if mapping_request:
-                logger.error(f"Server returned mapping request but no mapping was found")
+                logger.error(
+                    f"Server returned mapping request but no mapping was found"
+                )
             else:
                 logger.info("Mapping could not be automatically determined")
 
@@ -197,34 +219,43 @@ class HarvestProcessor:
         """
         Read the data from the file and save it as a temporary .parquet file self.data_file
         """
+
         def remap(df, mapping):
             """
             Remap the columns in the dataframe according to the mapping.
             """
             columns = list(df.columns)
             for col_name, mapping in mapping.items():
-                new_name = mapping.get('new_name')
+                new_name = mapping.get("new_name")
                 if new_name in df.columns and new_name != col_name:
-                    raise ValueError(f"New name '{new_name}' already exists in the dataframe")
-                if mapping['data_type'] in ["bool", "str"]:
+                    raise ValueError(
+                        f"New name '{new_name}' already exists in the dataframe"
+                    )
+                if mapping["data_type"] in ["bool", "str"]:
                     df[col_name] = df[col_name].astype(mapping["data_type"])
-                elif mapping['data_type'] == 'datetime64[ns]':
+                elif mapping["data_type"] == "datetime64[ns]":
                     df[col_name] = pandas.to_datetime(df[col_name])
                 else:
-                    if mapping['data_type'] == 'int':
-                        df[col_name] = fastnumbers.try_forceint(df[col_name], map=list, on_fail=math.nan)
+                    if mapping["data_type"] == "int":
+                        df[col_name] = fastnumbers.try_forceint(
+                            df[col_name], map=list, on_fail=math.nan
+                        )
                     else:
-                        df[col_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+                        df[col_name] = fastnumbers.try_float(
+                            df[col_name], map=list, on_fail=math.nan
+                        )
 
-                    addition = mapping.get('addition', 0)
-                    multiplier = mapping.get('multiplier', 1)
+                    addition = mapping.get("addition", 0)
+                    multiplier = mapping.get("multiplier", 1)
                     df[col_name] = df[col_name] + addition
                     df[col_name] = df[col_name] * multiplier
                 df.rename(columns={col_name: new_name}, inplace=True)
                 columns.pop(columns.index(col_name))
             # If there are any columns left, they are not in the mapping and should be converted to floats
             for col_name in columns:
-                df[col_name] = fastnumbers.try_float(df[col_name], map=list, on_fail=math.nan)
+                df[col_name] = fastnumbers.try_float(
+                    df[col_name], map=list, on_fail=math.nan
+                )
             return df
 
         def partition_generator(generator, partition_line_count=100_000):
@@ -241,30 +272,36 @@ class HarvestProcessor:
                     stopping = True
                 yield to_df(rows)
 
-        partition_line_count = self.monitored_path.get("max_partition_line_count", 100_000)
+        partition_line_count = self.monitored_path.get(
+            "max_partition_line_count", 100_000
+        )
 
         reader = self.input_file.load_data(
             self.file_path,
-            [c for c in self.input_file.column_info.keys() if self.input_file.column_info[c].get('has_data')]
+            [
+                c
+                for c in self.input_file.column_info.keys()
+                if self.input_file.column_info[c].get("has_data")
+            ],
         )
 
         data = dask.dataframe.from_map(
             pandas.DataFrame,
-            partition_generator(reader, partition_line_count=partition_line_count)
+            partition_generator(reader, partition_line_count=partition_line_count),
         )
 
         # Create a plot of key data columns for identification purposes
         self._plot_png(data)
 
         # Save the data as parquet
-        self.data_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet")
+        self.data_file_name = os.path.join(
+            tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet"
+        )
         data.to_parquet(
             self.data_file_name,
             write_index=False,
             compute=True,
-            custom_metadata={
-                'galv-harvester-version': VERSION
-            }
+            custom_metadata={"galv-harvester-version": VERSION},
         )
         self.row_count = data.shape[0].compute()
         self.partition_count = data.npartitions
@@ -274,17 +311,18 @@ class HarvestProcessor:
         Create a plot of key data columns for identification purposes
         """
         try:
-            self.png_file_name = os.path.join(tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.png")
+            self.png_file_name = os.path.join(
+                tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.png"
+            )
             hd.shade.cmap = ["lightblue", "darkblue"]
             hv.extension("matplotlib")
-            hv.output(fig='png', backend="matplotlib")
-            dataset = hv.Dataset(data, 'ElapsedTime_s', ['Voltage_V', 'Current_A'])
-            layout = (
-                    dataset.to(hv.Curve, 'ElapsedTime_s', 'Voltage_V') +
-                    dataset.to(hv.Curve, 'ElapsedTime_s', 'Current_A')
+            hv.output(fig="png", backend="matplotlib")
+            dataset = hv.Dataset(data, "ElapsedTime_s", ["Voltage_V", "Current_A"])
+            layout = dataset.to(hv.Curve, "ElapsedTime_s", "Voltage_V") + dataset.to(
+                hv.Curve, "ElapsedTime_s", "Current_A"
             )
-            layout.opts(hv.opts.Curve(framewise=True, aspect=4, sublabel_format=''))
-            hv.save(layout, self.png_file_name, fmt='png', dpi=300)
+            layout.opts(hv.opts.Curve(framewise=True, aspect=4, sublabel_format=""))
+            hv.save(layout, self.png_file_name, fmt="png", dpi=300)
             self.png_ok = True
         except Exception as e:
             logger.warning(f"Failed to create plot: {e}")
@@ -295,7 +333,7 @@ class HarvestProcessor:
         Upload the data to the server
         """
 
-        def pad0(n, width=math.floor(self.partition_count/10) + 1):
+        def pad0(n, width=math.floor(self.partition_count / 10) + 1):
             return f"{n:0{width}d}"
 
         successes = 0
@@ -303,77 +341,86 @@ class HarvestProcessor:
 
         for i in range(self.partition_count):
             filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{pad0(i)}.parquet"
-            with open(os.path.join(self.data_file_name, f"part.{i}.parquet"), 'rb') as f:
-                files = {'parquet_file': (filename, f)}
+            with open(
+                os.path.join(self.data_file_name, f"part.{i}.parquet"), "rb"
+            ) as f:
+                files = {"parquet_file": (filename, f)}
                 report = report_harvest_result(
                     path=self.file_path,
-                    monitored_path_id=self.monitored_path.get('id'),
+                    monitored_path_id=self.monitored_path.get("id"),
                     # send data in a flat format to accompany file upload protocol.
                     # Kinda hacky because it overwrites much of report_harvest_result's functionality
                     data={
-                        'format': 'flat',
-                        'status': settings.HARVESTER_STATUS_SUCCESS,
-                        'path': self.file_path,
-                        'monitored_path_id': self.monitored_path.get('id'),
-                        'task': settings.HARVESTER_TASK_IMPORT,
-                        'stage': settings.HARVEST_STAGE_UPLOAD_PARQUET,
-                        'total_row_count': self.row_count,
-                        'partition_number': i,
-                        'partition_count': self.partition_count,
-                        'filename': filename
+                        "format": "flat",
+                        "status": settings.HARVESTER_STATUS_SUCCESS,
+                        "path": self.file_path,
+                        "monitored_path_id": self.monitored_path.get("id"),
+                        "task": settings.HARVESTER_TASK_IMPORT,
+                        "stage": settings.HARVEST_STAGE_UPLOAD_PARQUET,
+                        "total_row_count": self.row_count,
+                        "partition_number": i,
+                        "partition_count": self.partition_count,
+                        "filename": filename,
                     },
-                    files=files
+                    files=files,
                 )
             if report is None:
-                errors[i] = (f"Failed to upload {filename} - API Error: no response from server")
+                errors[i] = (
+                    f"Failed to upload {filename} - API Error: no response from server"
+                )
             elif not report.ok:
                 try:
-                    errors[i] = (f"Failed to upload {filename} - API responded with Error: {report.json()['error']}")
+                    errors[i] = (
+                        f"Failed to upload {filename} - API responded with Error: {report.json()['error']}"
+                    )
                 except BaseException:
-                    errors[i] = f"Failed to upload {filename}. Received HTTP {report.status_code}"
+                    errors[i] = (
+                        f"Failed to upload {filename}. Received HTTP {report.status_code}"
+                    )
             else:
                 successes += 1
 
         if successes == 0 and self.partition_count > 0:
             raise RuntimeError("API Error: failed to upload all partitions to server")
         if successes != self.partition_count:
-            logger.error(f"Data Upload - {successes} of {self.partition_count} partitions uploaded successfully")
+            logger.error(
+                f"Data Upload - {successes} of {self.partition_count} partitions uploaded successfully"
+            )
             for filename, error in errors.items():
-                logger.error(f"Data Upload - Partition {filename} failed with error: {error}")
+                logger.error(
+                    f"Data Upload - Partition {filename} failed with error: {error}"
+                )
         else:
             logger.info(f"Data Upload - {successes} partitions uploaded successfully")
 
         report_harvest_result(
             path=self.file_path,
-            monitored_path_id=self.monitored_path.get('id'),
+            monitored_path_id=self.monitored_path.get("id"),
             content={
-                'task': settings.HARVESTER_TASK_IMPORT,
-                'stage': settings.HARVEST_STAGE_UPLOAD_COMPLETE,
-                'data': {
-                    'successes': successes,
-                    'errors': errors
-                }
-            }
+                "task": settings.HARVESTER_TASK_IMPORT,
+                "stage": settings.HARVEST_STAGE_UPLOAD_COMPLETE,
+                "data": {"successes": successes, "errors": errors},
+            },
         )
 
         if self.png_ok:
-            with open(self.png_file_name, 'rb') as f:
-                files = {'png_file': f}
+            with open(self.png_file_name, "rb") as f:
+                files = {"png_file": f}
                 report = report_harvest_result(
                     path=self.file_path,
-                    monitored_path_id=self.monitored_path.get('id'),
+                    monitored_path_id=self.monitored_path.get("id"),
                     # send data in a flat format to accompany file upload protocol.
                     # Kinda hacky because it overwrites much of report_harvest_result's functionality
                     data={
-                        'format': 'flat',
-                        'status': settings.HARVESTER_STATUS_SUCCESS,
-                        'path': self.file_path,
-                        'monitored_path_id': self.monitored_path.get('id'),
-                        'task': settings.HARVESTER_TASK_IMPORT,
-                        'stage': settings.HARVEST_STAGE_UPLOAD_PNG,
-                        'filename': os.path.basename(self.png_file_name)
+                        "format": "flat",
+                        "status": settings.HARVESTER_STATUS_SUCCESS,
+                        "path": self.file_path,
+                        "monitored_path_id": self.monitored_path.get("id"),
+                        "task": settings.HARVESTER_TASK_IMPORT,
+                        "stage": settings.HARVEST_STAGE_UPLOAD_PNG,
+                        "filename": os.path.basename(self.png_file_name),
                     },
-                    files=files
+                    files=files,
                 )
             try:
                 HarvestProcessor.check_response("Upload PNG", report)
@@ -384,7 +431,7 @@ class HarvestProcessor:
         """
         Delete temporary files created during the process
         """
-        for attribute in ['data_file_name', 'png_file_name']:
+        for attribute in ["data_file_name", "png_file_name"]:
             if hasattr(self, attribute):
                 filename = getattr(self, attribute)
                 if os.path.exists(filename):
@@ -394,7 +441,9 @@ class HarvestProcessor:
                         else:
                             os.remove(filename)
                     except PermissionError:
-                        logger.warning(f"Failed to delete {filename}. This will have to be manually deleted.")
+                        logger.warning(
+                            f"Failed to delete {filename}. This will have to be manually deleted."
+                        )
 
     def __del__(self):
         self._delete_temp_files()

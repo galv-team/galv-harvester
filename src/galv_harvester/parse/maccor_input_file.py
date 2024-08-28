@@ -10,17 +10,13 @@ from datetime import datetime
 import xlrd
 import maya
 from .input_file import InputFile
-from .exceptions import (
-    UnsupportedFileTypeError,
-    EmptyFileError,
-    InvalidDataInFileError
-)
+from .exceptions import UnsupportedFileTypeError, EmptyFileError, InvalidDataInFileError
 from ..settings import get_logger
 
 
 class MaccorInputFile(InputFile):
     """
-        A class for handling input files
+    A class for handling input files
     """
 
     def __init__(self, file_path, **kwargs):
@@ -30,7 +26,7 @@ class MaccorInputFile(InputFile):
 
     def identify_columns(self, reader):
         """
-            Identifies columns in a maccor csv or tsv file"
+        Identifies columns in a maccor csv or tsv file"
         """
         headers = [header for header in next(reader) if header != ""]
         correct_number_of_columns = len(headers)
@@ -90,20 +86,20 @@ class MaccorInputFile(InputFile):
 
         # add unit info for known columns
         known_units = {
-            "Amp-hr": 'Amp-hr',
-            "Amps": 'Amps',
-            "Watt-hr": 'Watt-hr',
-            "StepTime": 's',
-            "Step (Sec)": 's',
-            "Volts": 'Volts',
-            "TestTime": 's',
-            "Test (Sec)": 's',
-            "Rec#": '',
-            "Temp 1": 'celsius',
+            "Amp-hr": "Amp-hr",
+            "Amps": "Amps",
+            "Watt-hr": "Watt-hr",
+            "StepTime": "s",
+            "Step (Sec)": "s",
+            "Volts": "Volts",
+            "TestTime": "s",
+            "Test (Sec)": "s",
+            "Rec#": "",
+            "Temp 1": "celsius",
         }
         for name, info in column_info.items():
             if name in known_units:
-                column_info[name]['unit'] = known_units[name]
+                column_info[name]["unit"] = known_units[name]
 
         # account for 0 based indexing
         total_rows = row_idx + 1
@@ -120,7 +116,7 @@ class MaccorInputFile(InputFile):
 
     def load_metadata(self):
         """
-            Load metadata in a maccor csv or tsv file"
+        Load metadata in a maccor csv or tsv file"
         """
         metadata = {}
         with open(self.file_path, "r") as csvfile:
@@ -136,8 +132,7 @@ class MaccorInputFile(InputFile):
                 ntpath.basename(self.file_path)
             )[0]
             metadata["Machine Type"] = "Maccor"
-            column_info, total_rows, first_rec, last_rec = \
-                self.identify_columns(reader)
+            column_info, total_rows, first_rec, last_rec = self.identify_columns(reader)
             metadata["num_rows"] = total_rows
             metadata["first_sample_no"] = first_rec
             metadata["last_sample_no"] = last_rec
@@ -146,10 +141,10 @@ class MaccorInputFile(InputFile):
 
     def load_data(self, file_path, columns):
         """
-            Load data in a maccor csv or tsv file"
+        Load data in a maccor csv or tsv file"
         """
 
-        with open(file_path, "r", encoding='utf-8-sig') as csvfile:
+        with open(file_path, "r", encoding="utf-8-sig") as csvfile:
             # get rid of metadata rows
             try:
                 csvfile.readline()
@@ -171,9 +166,7 @@ class MaccorInputFile(InputFile):
                 if column_name in columns:
                     columns_of_interest.append(col_idx)
             for row_idx, row in enumerate(reader):
-                row = handle_recno(
-                    row, correct_number_of_columns, recno_col, row_idx
-                )
+                row = handle_recno(row, correct_number_of_columns, recno_col, row_idx)
                 yield {
                     column_names[col_idx]: row[col_idx]
                     for col_idx in columns_of_interest
@@ -308,7 +301,7 @@ class MaccorInputFile(InputFile):
                 )
 
     def is_maccor_text_file(self, file_path, delimiter):
-        with open(file_path, "r", encoding='utf-8-sig') as f:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
             try:
                 line = f.readline()
             except UnicodeDecodeError as e:
@@ -336,14 +329,11 @@ class MaccorInputFile(InputFile):
         return True
 
     def validate_file(self, file_path):
-        if not (
-                file_path.endswith(".csv") or
-                file_path.endswith(".txt")
-        ):
+        if not (file_path.endswith(".csv") or file_path.endswith(".txt")):
             raise UnsupportedFileTypeError
 
         self.delimiter = None
-        for delim in [',', '\t']:
+        for delim in [",", "\t"]:
             if self.is_maccor_text_file(file_path, delim):
                 self.delimiter = delim
         if self.delimiter is None:
@@ -352,7 +342,7 @@ class MaccorInputFile(InputFile):
 
 class MaccorExcelInputFile(MaccorInputFile):
     """
-        A class for handling input files
+    A class for handling input files
     """
 
     def __init__(self, file_path):
@@ -361,7 +351,7 @@ class MaccorExcelInputFile(MaccorInputFile):
 
     def identify_columns(self, wbook):
         """
-            Identifies columns in a maccor excel file"
+        Identifies columns in a maccor excel file"
         """
         sheet = wbook.sheet_by_index(0)
         column_has_data = [False for col in range(0, sheet.ncols)]
@@ -374,9 +364,7 @@ class MaccorExcelInputFile(MaccorInputFile):
             headers_row = 0
         for col in range(0, sheet.ncols):
             headers.append(sheet.cell_value(headers_row, col))
-            is_numeric = isfloat(
-                sheet.cell_value(headers_row+1, col)
-            )
+            is_numeric = isfloat(sheet.cell_value(headers_row + 1, col))
             column_is_numeric.append(is_numeric)
             if is_numeric:
                 numeric_columns.append(col)
@@ -386,7 +374,7 @@ class MaccorExcelInputFile(MaccorInputFile):
         self.logger.debug("numeric_columns: {}".format(numeric_columns))
         try:
             recno_col = headers.index("Rec#")
-            first_rec = sheet.cell_value(headers_row+1, recno_col)
+            first_rec = sheet.cell_value(headers_row + 1, recno_col)
         except ValueError:
             # Don't have record numbers, make them up
             first_rec = 1
@@ -395,7 +383,7 @@ class MaccorExcelInputFile(MaccorInputFile):
             self.logger.debug("Loading sheet... " + str(sheet_id))
             sheet = wbook.sheet_by_index(sheet_id)
             total_rows += sheet.nrows - 1 - int(self._has_metadata_row)
-            for row in range(headers_row+1, sheet.nrows):
+            for row in range(headers_row + 1, sheet.nrows):
                 for column in numeric_columns[:]:
                     if float(sheet.cell_value(row, column)) != 0.0:
                         column_has_data[column] = True
@@ -412,7 +400,7 @@ class MaccorExcelInputFile(MaccorInputFile):
                 # sure if the last sheet actually will have data
                 try:
                     recno_col = headers.index("Rec#")
-                    last_rec = sheet.cell_value(headers_row+1, row)
+                    last_rec = sheet.cell_value(headers_row + 1, row)
                 except ValueError:
                     # Don't have record numbers, make them up
                     last_rec = total_rows
@@ -430,10 +418,9 @@ class MaccorExcelInputFile(MaccorInputFile):
         self.logger.debug("Num rows {}".format(total_rows))
         return column_info, total_rows, first_rec, last_rec
 
-    def load_data(self, file_path,
-                  columns, column_renames=None):
+    def load_data(self, file_path, columns, column_renames=None):
         """
-            Load metadata in a maccor excel file"
+        Load metadata in a maccor excel file"
         """
         if self._has_metadata_row:
             headers_row = 1
@@ -459,7 +446,7 @@ class MaccorExcelInputFile(MaccorInputFile):
             for sheet_id in range(0, wbook.nsheets):
                 self.logger.debug("Loading sheet..." + str(sheet_id))
                 sheet = wbook.sheet_by_index(sheet_id)
-                for row in range(headers_row+1, sheet.nrows):
+                for row in range(headers_row + 1, sheet.nrows):
                     yield {
                         column_names[col_idx]: (
                             sheet.cell_value(row, col_idx)
@@ -473,10 +460,10 @@ class MaccorExcelInputFile(MaccorInputFile):
 
     def load_metadata(self):
         """
-            Load metadata in a maccor excel file"
+        Load metadata in a maccor excel file"
         """
         metadata = {}
-        metadata['Filename'] = self.file_path
+        metadata["Filename"] = self.file_path
         with xlrd.open_workbook(
             self.file_path, on_demand=True, logfile=LogFilter(self.logger)
         ) as wbook:
@@ -527,8 +514,7 @@ class MaccorExcelInputFile(MaccorInputFile):
                     os.path.getctime(self.file_path)
                 )
             metadata["Machine Type"] = "Maccor"
-            column_info, total_rows, first_rec, last_rec = \
-                self.identify_columns(wbook)
+            column_info, total_rows, first_rec, last_rec = self.identify_columns(wbook)
             metadata["num_rows"] = total_rows
             metadata["first_sample_no"] = first_rec
             metadata["last_sample_no"] = last_rec
@@ -544,18 +530,18 @@ class MaccorExcelInputFile(MaccorInputFile):
 
 class MaccorRawInputFile(MaccorInputFile):
     """
-        A class for handling input files
+    A class for handling input files
     """
 
     def __init__(self, file_path):
         self.logger = get_logger(f"InputFile({file_path})")
         self.validate_file(file_path)
         super().__init__(file_path)
-        self.delimiter = '\t'
+        self.delimiter = "\t"
 
     def load_metadata(self):
         """
-            Load metadata in a maccor raw file"
+        Load metadata in a maccor raw file"
         """
         metadata = {}
         column_info = {}
@@ -566,9 +552,7 @@ class MaccorRawInputFile(MaccorInputFile):
             metadata["Today's Date"] = maya.parse(
                 first[0].split(" ")[2], year_first=False
             ).datetime()
-            metadata["Date of Test"] = maya.parse(
-                first[1], year_first=False
-            ).datetime()
+            metadata["Date of Test"] = maya.parse(first[1], year_first=False).datetime()
             metadata["Filename"] = first[3].split(" Procedure:")[0]
             metadata["Dataset Name"] = ntpath.basename(metadata["Filename"])
             # Just shove everything in the misc_file_data for now rather than
@@ -580,8 +564,7 @@ class MaccorRawInputFile(MaccorInputFile):
             # parse what we have and leave handling anything different to some
             # future person
             metadata["Machine Type"] = "Maccor"
-            column_info, total_rows, first_rec, last_rec = \
-                self.identify_columns(reader)
+            column_info, total_rows, first_rec, last_rec = self.identify_columns(reader)
             metadata["num_rows"] = total_rows
             metadata["first_sample_no"] = first_rec
             metadata["last_sample_no"] = last_rec
@@ -590,14 +573,14 @@ class MaccorRawInputFile(MaccorInputFile):
         return metadata, column_info
 
     def validate_file(self, file_path):
-        self.logger.debug('is_maccor_raw_file')
-        with open(file_path, "r", encoding='utf-8-sig') as f:
+        self.logger.debug("is_maccor_raw_file")
+        with open(file_path, "r", encoding="utf-8-sig") as f:
             try:
-                self.logger.debug('got line')
+                self.logger.debug("got line")
                 line = f.readline()
             except UnicodeDecodeError as e:
                 raise UnsupportedFileTypeError from e
-            self.logger.debug('got line', line)
+            self.logger.debug("got line", line)
             line_start = "Today's Date"
             if not line.startswith(line_start):
                 raise UnsupportedFileTypeError
@@ -656,7 +639,7 @@ def handle_recno(row, correct_number_of_columns, recno_col, row_idx):
             row = (
                 row[0:recno_col]
                 + [(row[recno_col] + row[recno_col + 1]).replace(",", "")]
-                + row[recno_col + 2:]
+                + row[recno_col + 2 :]
             )
         else:
             raise InvalidDataInFileError(
@@ -672,13 +655,13 @@ def handle_recno(row, correct_number_of_columns, recno_col, row_idx):
 
 def clean_key(key):
     """
-        Unescapes and removes trailing characters on strings
+    Unescapes and removes trailing characters on strings
     """
     return key.replace("''", "'").strip().rstrip(":")
 
 
 def clean_value(value):
     """
-        Trims values
+    Trims values
     """
     return value.replace("''", "'").strip().rstrip("\0").strip()

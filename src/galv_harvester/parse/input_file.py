@@ -11,12 +11,12 @@ from ..settings import get_logger
 
 class InputFile:
     """
-        A class for handling input files
+    A class for handling input files
     """
 
     def __init__(self, file_path):
         self.file_path = file_path
-        if not hasattr(self, 'logger'):
+        if not hasattr(self, "logger"):
             self.logger = get_logger(f"InputFile({self.file_path})")
         self.metadata, self.column_info = self.load_metadata()
 
@@ -33,10 +33,10 @@ class InputFile:
 
     def load_metadata(self):
         """
-            returns a tuple of (metadata, column_info)
+        returns a tuple of (metadata, column_info)
 
-            metadata is a dictionary of metadata keys to values
+        metadata is a dictionary of metadata keys to values
 
-            column_info is a dictionary of column names to dictionaries of column info
+        column_info is a dictionary of column names to dictionaries of column info
         """
         raise UnsupportedFileTypeError()

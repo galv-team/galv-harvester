@@ -9,8 +9,8 @@ from .input_file import InputFile
 
 class ArbinCSVFile(InputFile):
     """
-        A class for handling Arbin csv files.
-        DelimitedFileInput fails to pick these up because it breaks on the space in the datetime rather than on ,
+    A class for handling Arbin csv files.
+    DelimitedFileInput fails to pick these up because it breaks on the space in the datetime rather than on ,
     """
 
     def __init__(self, file_path, **kwargs):
@@ -23,13 +23,17 @@ class ArbinCSVFile(InputFile):
 
         :raises UnsupportedFileTypeError: if the file is not a supported type
         """
-        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
+        with open(file_path, newline="", encoding="utf-8-sig") as csvfile:
             try:
                 reader = csv.reader(
-                    csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL
+                    csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
                 )
                 self.header = next(reader)
-                assert [h.lower() for h in self.header[0:3]] == ["data_point", "date_time", "test_time(s)"]
+                assert [h.lower() for h in self.header[0:3]] == [
+                    "data_point",
+                    "date_time",
+                    "test_time(s)",
+                ]
                 data = next(reader)
                 assert len(self.header) == len(data)
                 self.dialect = reader.dialect
@@ -42,7 +46,7 @@ class ArbinCSVFile(InputFile):
     def load_data(self, file_path, columns):
         column_names = self.header
 
-        with open(file_path, newline='', encoding='utf-8-sig') as csvfile:
+        with open(file_path, newline="", encoding="utf-8-sig") as csvfile:
             reader = csv.reader(csvfile, dialect=self.dialect)
             next(reader)
             for row in reader:
