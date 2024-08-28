@@ -468,7 +468,7 @@ class HarvestProcessor:
         for attribute in ["data_file_name", "png_file_name"]:
             if hasattr(self, attribute):
                 filename = getattr(self, attribute)
-                if os.path.exists(filename):
+                if filename is not None and os.path.exists(filename):
                     try:
                         if os.path.isdir(filename):
                             shutil.rmtree(filename)
