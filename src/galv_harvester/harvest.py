@@ -81,7 +81,7 @@ class HarvestProcessor:
                 input_file = input_file_cls(file_path=file_path)
             except UnsupportedFileTypeError as e:
                 self.parser_errors[input_file_cls.__name__] = e
-                logger.debug("...failed with: ", type(e), e)
+                logger.debug(f"...failed with {e.__class__.__name__}: {e}")
                 continue
             except Exception as e:
                 logger.error(
