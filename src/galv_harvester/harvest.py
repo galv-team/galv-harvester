@@ -6,6 +6,8 @@ import datetime
 
 import tempfile
 import time
+from typing import Optional
+
 import dask.dataframe
 import pandas
 import fastnumbers
@@ -46,6 +48,14 @@ class HarvestProcessor:
         ArbinCSVFile,
         DelimitedInputFile,  # Should be last because it processes files line by line and accepts anything table-like
     ]
+    summary_row_count = 10
+    no_upload = False
+
+    mapping = None
+    png_file_name = None
+    data_file_name = None
+    row_count = None
+    partition_count = None
     parser_errors = {}
 
     @staticmethod
@@ -60,7 +70,7 @@ class HarvestProcessor:
                 logger.error(f"{step} failed: received HTTP {response.status_code}")
             raise RuntimeError("{step}: failed server responded with error")
 
-    def __init__(self, file_path: str, monitored_path: dict):
+    def __init__(self, file_path: str, monitored_path: Optional[dict]):
         self.mapping = None
         self.file_path = file_path
         self.monitored_path = monitored_path
@@ -161,12 +171,12 @@ class HarvestProcessor:
         )
         HarvestProcessor.check_response("Report Metadata", report)
 
-    def _report_summary(self):
+    def summarise_columns(self):
         """
-        Report the column metadata to the server.
-        Data include the column names, types, units, and whether they relate to recognised standard columns.
+        Column summary is the first few rows of the data file.
+
+        Returns a pandas DataFrame of the first self.summary_row_count rows of all columns in the file.
         """
-        summary_row_count = 10
         summary_data = []
         iterator = self.input_file.load_data(
             self.file_path,
@@ -178,10 +188,17 @@ class HarvestProcessor:
         )
         for row in iterator:
             summary_data.append(row)
-            if len(summary_data) >= summary_row_count:
+            if len(summary_data) >= self.summary_row_count:
                 break
 
-        summary = pandas.DataFrame(summary_data)
+        return pandas.DataFrame(summary_data)
+
+    def _report_summary(self):
+        """
+        Report the column metadata to the server.
+        Data include the column names, types, units, and whether they relate to recognised standard columns.
+        """
+        summary = self.summarise_columns()
 
         # Upload results
         report = report_harvest_result(
@@ -219,6 +236,10 @@ class HarvestProcessor:
         """
         Read the data from the file and save it as a temporary .parquet file self.data_file
         """
+        if self.mapping is None:
+            raise RuntimeError(
+                "Cannot process data without a mapping. Set `self.mapping` first."
+            )
 
         def remap(df, mapping):
             """
@@ -272,8 +293,10 @@ class HarvestProcessor:
                     stopping = True
                 yield to_df(rows)
 
-        partition_line_count = self.monitored_path.get(
-            "max_partition_line_count", 100_000
+        partition_line_count = (
+            self.monitored_path.get("max_partition_line_count", 100_000)
+            if self.monitored_path
+            else 100_000
         )
 
         reader = self.input_file.load_data(
@@ -306,6 +329,15 @@ class HarvestProcessor:
         self.row_count = data.shape[0].compute()
         self.partition_count = data.npartitions
 
+    def process_data(self):
+        """
+        Process the data in the file.
+
+        Will set self.data_file_name, self.row_count, and self.partition_count.
+        """
+        # Public interface for processing data
+        self._prepare_data()
+
     def _plot_png(self, data):
         """
         Create a plot of key data columns for identification purposes
@@ -328,19 +360,21 @@ class HarvestProcessor:
             logger.warning(f"Failed to create plot: {e}")
             self.png_ok = False
 
+    def pad0(self, n, width: int = None):
+        if width is None:
+            width = math.floor(self.partition_count / 10) + 1
+        return f"{n:0{width}d}"
+
     def _upload_data(self):
         """
         Upload the data to the server
         """
 
-        def pad0(n, width=math.floor(self.partition_count / 10) + 1):
-            return f"{n:0{width}d}"
-
         successes = 0
         errors = {}
 
         for i in range(self.partition_count):
-            filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{pad0(i)}.parquet"
+            filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.parquet"
             with open(
                 os.path.join(self.data_file_name, f"part.{i}.parquet"), "rb"
             ) as f:
@@ -447,3 +481,35 @@ class HarvestProcessor:
 
     def __del__(self):
         self._delete_temp_files()
+
+
+class InternalHarvestProcessor(HarvestProcessor):
+    """
+    The internal HarvesterProcessor is designed to run within an instance of the Galv Django backend.
+    It does not upload data to the server (because the data are already on the server),
+    but does perform parsing, summarising, conversion, and plotting.
+
+    This class does not make API requests. Consequently, none of its methods access settings.
+    """
+
+    no_upload = True
+
+    def __init__(self, file_path: str):
+        super().__init__(file_path, None)
+
+    def harvest(self):
+        raise NotImplementedError(
+            "Do not use the InternalHarvestProcessor harvest method. "
+            "Instead use the specific methods you require, e.g. summarise_data, and handle their return values."
+        )
+
+    @property
+    def partition_names(self):
+        if self.partition_count is None:
+            raise RuntimeError(
+                "Data has not been processed. Run self.process_data() first."
+            )
+        return [
+            f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.parquet"
+            for i in range(self.partition_count)
+        ]
