@@ -7,7 +7,7 @@ import re
 import time
 import traceback
 
-from src.galv_harvester.plugins import get_parsers
+from galv_harvester.plugins import get_parsers
 from .parse.exceptions import UnsupportedFileTypeError
 from .settings import (
     get_logger,

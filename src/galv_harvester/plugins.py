@@ -1,7 +1,7 @@
 import importlib
 import pkgutil
 
-from src.galv_harvester.parse.input_file import InputFile
+from galv_harvester.parse.input_file import InputFile
 from .settings import get_logger
 
 

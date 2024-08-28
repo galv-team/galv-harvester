@@ -11,8 +11,8 @@ import time
 import click
 import requests
 
-from src.galv_harvester.plugins import get_parsers
-from src.galv_harvester.settings import logger
+from galv_harvester.plugins import get_parsers
+from galv_harvester.settings import logger
 from . import run, settings, api
 
 
