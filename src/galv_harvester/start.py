@@ -383,11 +383,15 @@ def register(
     def check_registration_response(r: Response):
         if r.status_code != 201:
             try:
-                raise ConnectionError(r.json())
+                content = r.json()
             except (json.JSONDecodeError, AttributeError, KeyError):
-                raise ConnectionError(
-                    f"Unable to connect to {r.url} -- {r.status_code}"
-                )
+                try:
+                    content = str(r.content)
+                except BaseException:
+                    content = "[Unparsable content]"
+            raise ConnectionError(
+                f"Expected HTTP 201 from {r.url}. Got {r.status_code}\n{content}"
+            )
 
     click.echo(f"Registering new harvester {name} to Lab {lab['name']}")
     result = query(
