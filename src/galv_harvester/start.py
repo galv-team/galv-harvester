@@ -11,9 +11,20 @@ import time
 import click
 import requests
 
-from galv_harvester.plugins import get_parsers
 from galv_harvester.settings import logger
+from requests import Response
+
 from . import run, settings, api
+
+
+def check_response_ok(response: Response):
+    if response.status_code >= 400:
+        try:
+            raise ConnectionError(response.json())
+        except (json.JSONDecodeError, AttributeError, KeyError):
+            raise ConnectionError(
+                f"Unable to connect to {response.url} -- {response.status_code}"
+            )
 
 
 def query(
@@ -21,8 +32,18 @@ def query(
     data: object = None,
     retries: int = 5,
     sleep_seconds: float = 3.0,
+    check_response=check_response_ok,
     **kwargs,
 ):
+    def blank_check(r: Response):
+        pass
+
+    if not callable(check_response):
+        if check_response is not None:
+            raise ValueError(
+                "check_response must be a callable (raise an error if check fails) or None"
+            )
+        check_response = blank_check
     while retries > 0:
         try:
             if data is None:
@@ -31,11 +52,7 @@ def query(
             else:
                 result = requests.post(url, data=data, **kwargs)
                 click.echo(f"POST {url}; {json.dumps(data)} {result.status_code}")
-            if result.status_code >= 400:
-                try:
-                    raise ConnectionError(result.json())
-                except (json.JSONDecodeError, AttributeError, KeyError):
-                    raise ConnectionError(f"Unable to connect to {url}")
+            check_response(result)
             return result.json()
         except ConnectionError as e:
             click.echo(f"Unable to connect to {url} -- {e}", err=True)
@@ -363,11 +380,21 @@ def register(
             break
 
     # Register
+    def check_registration_response(r: Response):
+        if r.status_code != 201:
+            try:
+                raise ConnectionError(r.json())
+            except (json.JSONDecodeError, AttributeError, KeyError):
+                raise ConnectionError(
+                    f"Unable to connect to {r.url} -- {r.status_code}"
+                )
+
     click.echo(f"Registering new harvester {name} to Lab {lab['name']}")
     result = query(
         f"{url}harvesters/",
         {"lab": lab["url"], "name": name},
         headers={"Authorization": f"Bearer {api_token}"},
+        check_response=check_registration_response,
     )
 
     # Save credentials
@@ -462,7 +489,7 @@ def harvest(verbose: bool, paths):
             if not monitored_path:
                 click.echo(f"Could not find {path} in any monitored paths.")
                 if not printed_paths:
-                    click.echo(f"Available monitored paths [path : regex] are:")
+                    click.echo("Available monitored paths [path : regex] are:")
                     for mp in monitored_paths:
                         click.echo(f"{mp['path']} : {mp['regex']}")
                     printed_paths = True
