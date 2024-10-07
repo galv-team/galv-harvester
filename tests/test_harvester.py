@@ -173,31 +173,31 @@ class TestHarvester(unittest.TestCase):
         ]
         upload_fired = False
         for c in calls:
-            if not "content" in c.kwargs:
+            if "content" not in c.kwargs:
                 if "files" in c.kwargs and not upload_fired:
                     upload_fired = True
                     data = c.kwargs.get("data")
                     if "partition_number" not in data:
                         raise AssertionError(
-                            f"Expected upload parquet partitions report to contain row count"
+                            "Expected upload parquet partitions report to contain row count"
                         )
                     if "partition_count" not in data:
                         raise AssertionError(
-                            f"Expected upload parquet partitions report to contain partition count"
+                            "Expected upload parquet partitions report to contain partition count"
                         )
                     if "total_row_count" not in data:
                         raise AssertionError(
-                            f"Expected upload parquet partitions report to contain total row count"
+                            "Expected upload parquet partitions report to contain total row count"
                         )
                     if "filename" not in data:
                         raise AssertionError(
-                            f"Expected upload parquet partitions report to contain filename"
+                            "Expected upload parquet partitions report to contain filename"
                         )
                     return
                 else:
                     if upload_fired:
-                        raise AssertionError(f"Received multiple upload calls")
-                    raise AssertionError(f"Report made with no content")
+                        raise AssertionError("Received multiple upload calls")
+                    raise AssertionError("Report made with no content")
 
             if c.kwargs["content"]["task"] == settings.HARVESTER_TASK_IMPORT:
                 stage = stages.pop(0)
@@ -225,16 +225,16 @@ class TestHarvester(unittest.TestCase):
                             json.loads(data), dict
                         ):
                             raise AssertionError(
-                                f"Expected data summary to be JSON representation of a dictionary"
+                                "Expected data summary to be JSON representation of a dictionary"
                             )
                     elif s == settings.HARVEST_STAGE_UPLOAD_COMPLETE:
                         if "successes" not in data:
                             raise AssertionError(
-                                f"Expected upload completion report to contain success count"
+                                "Expected upload completion report to contain success count"
                             )
                         if "errors" not in data:
                             raise AssertionError(
-                                f"Expected upload completion report to contain errors list"
+                                "Expected upload completion report to contain errors list"
                             )
                 except AssertionError as e:
                     print(data)
@@ -268,11 +268,11 @@ class TestHarvester(unittest.TestCase):
                         is None
                     ):
                         raise AssertionError(
-                            f"Expected import report to contain 'preamble'"
+                            "Expected import report to contain 'preamble'"
                         )
                     else:
                         return
-            raise AssertionError(f"Could not find import report with 'preamble'")
+            raise AssertionError("Could not find import report with 'preamble'")
 
         self.import_file("preamble.csv", additional_checks=validate_preamble)
 

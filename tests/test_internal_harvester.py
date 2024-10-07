@@ -5,7 +5,6 @@ import unittest
 import os
 
 import pandas
-from galv_harvester.parse.delimited_input_file import DelimitedInputFile
 from galv_harvester.harvest import InternalHarvestProcessor
 from tests.test_harvester import get_test_file_path
 

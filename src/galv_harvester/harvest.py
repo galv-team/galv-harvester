@@ -227,7 +227,7 @@ class HarvestProcessor:
         if not isinstance(self.mapping, dict):
             if mapping_request:
                 logger.error(
-                    f"Server returned mapping request but no mapping was found"
+                    "Server returned mapping request but no mapping was found"
                 )
             else:
                 logger.info("Mapping could not be automatically determined")

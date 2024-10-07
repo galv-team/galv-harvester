@@ -129,9 +129,9 @@ class IviumInputFile(InputFile):
 
                     control = float(row.get(key))
                     if control > 0:
-                        experiment_label = f"Charge "
+                        experiment_label = "Charge "
                     else:
-                        experiment_label = f"Discharge "
+                        experiment_label = "Discharge "
 
                     experiment_label += f"at {control} {units} "
                 experiment_label += f"for {time - prev_time} seconds"
@@ -230,7 +230,7 @@ class IviumInputFile(InputFile):
 
                 else:
                     # check if we've parsed the file ok
-                    if not "Mconfig" in ivium_metadata:
+                    if "Mconfig" not in ivium_metadata:
                         raise UnsupportedFileTypeError("found unexpected line", line)
                     # looks ok, check samples start where we expect them to
                     for i in range(4):

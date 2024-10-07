@@ -41,7 +41,7 @@ class ArbinCSVFile(InputFile):
                 raise UnsupportedFileTypeError() from e
 
         super().__init__(file_path)
-        self.logger.info(f"Type is Arbin CSV")
+        self.logger.info("Type is Arbin CSV")
 
     def load_data(self, file_path, columns):
         column_names = self.header

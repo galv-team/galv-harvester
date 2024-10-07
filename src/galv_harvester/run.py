@@ -13,7 +13,6 @@ from .settings import (
     get_logger,
     get_setting,
     HARVESTER_TASK_FILE_SIZE,
-    HARVESTER_TASK_IMPORT,
     HARVEST_STAGE_COMPLETE,
     HARVESTER_TASK_IMPORT,
     HARVEST_STAGE_FAILED,

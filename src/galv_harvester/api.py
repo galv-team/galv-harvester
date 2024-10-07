@@ -103,11 +103,11 @@ def update_config():
                 if key in old.keys():
                     logger.info(f"Updating value for setting '{key}'")
                     logger.info(f"Old value: {json.dumps(old[key], cls=NpEncoder)}")
-                    logger.info(f"New value: [not set]")
+                    logger.info("New value: [not set]")
                     dirty = True
                 if key in new.keys():
                     logger.info(f"Updating value for setting '{key}'")
-                    logger.info(f"Old value: [not set]")
+                    logger.info("Old value: [not set]")
                     logger.info(f"New value: {json.dumps(new[key], cls=NpEncoder)}")
                     dirty = True
 
