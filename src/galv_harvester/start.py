@@ -305,7 +305,7 @@ def register(
         break
 
     # Check lab okay
-    if lab_id is not None and lab_id not in [l["id"] for l in labs_administered]:
+    if lab_id is not None and lab_id not in [x["id"] for x in labs_administered]:
         click.echo(f"Lab {lab_id} is not administered by this user.", err=True)
         exit(1)
 
