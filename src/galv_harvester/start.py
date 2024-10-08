@@ -288,7 +288,7 @@ def register(
                 f"{url}labs/", headers={"Authorization": f"Bearer {api_token}"}
             )
             labs_administered = [
-                l for l in labs["results"] if l["permissions"]["write"]
+                x for x in labs["results"] if x["permissions"]["write"]
             ]
         except BaseException as e:
             click.echo(f"Unable to retrieve lab list using API key -- {e}", err=True)
@@ -358,7 +358,7 @@ def register(
 
         lab_id = labs[input_char]["id"]
 
-    lab = [l for l in labs_administered if l["id"] == lab_id][0]
+    lab = [x for x in labs_administered if x["id"] == lab_id][0]
 
     # Check name okay
     if name is None:
