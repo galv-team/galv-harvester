@@ -3,7 +3,6 @@ import json
 
 
 class NpEncoder(json.JSONEncoder):
-
     # https://stackoverflow.com/a/57915246
     def default(self, obj):
         if isinstance(obj, np.integer):

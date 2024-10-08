@@ -32,16 +32,16 @@ The mapping object is a dictionary with the following structure:
    }
 }
 ```
-Columns will be coerced to the specified data type. 
-Coercion is done using the `pd.Series.asdtype()` function, except for datetime64[ns] columns, 
+Columns will be coerced to the specified data type.
+Coercion is done using the `pd.Series.asdtype()` function, except for datetime64[ns] columns,
 which are coerced using `pd.to_datetime(x)`.
 
 Numerical (int/float) columns will be rebased and rescaled according to the `multiplier` and `addition` fields.
 New column values = (old column values + `addition`) * `multiplier`.
 
 **Columns that are not in the mapping object are converted to float.**
-This is to save space. While parquet files can handle strings fairly well, 
-they are not efficient at storing strings that are mostly numbers because 
+This is to save space. While parquet files can handle strings fairly well,
+they are not efficient at storing strings that are mostly numbers because
 they are stored using a dictionary encoding suited to reoccurring strings.
 
 This means that, if a numeric column is not in the mapping object and we store it as a string,

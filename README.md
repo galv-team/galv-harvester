@@ -33,13 +33,13 @@ galv-harvester setup
 
 The harvester will prompt you for the necessary settings to connect to the Galv server (see [Initial Setup](#initial-setup)).
 
-Alternatively, you can specify the settings as environment variables 
+Alternatively, you can specify the settings as environment variables
 (see [Using Environment Variables](#using-environment-variables))
 or as [command line arguments](#using-command-line-arguments) to the `galv-harvester` program.
 
 ## Initial Setup
 
-There are three ways to set up the harvester: using the [setup wizard](#using-the-setup-wizard), 
+There are three ways to set up the harvester: using the [setup wizard](#using-the-setup-wizard),
 using [command line arguments](#using-command-line-arguments),
 or by specifying [environment variables](#using-environment-variables).
 You can use a combination of both methods, specifying some settings in the environment and others in the wizard.
@@ -52,11 +52,11 @@ First, you'll be asked for the [Galv server](https://github.com/galv-team/galv-b
 This should be the URL of the Galv server you have set up.
 Providing a frontend URL will not work, as the harvester needs to communicate with the backend.
 
-Next, you'll be asked for your API token. 
+Next, you'll be asked for your API token.
 This can be generated in either the Galv frontend or backend.
 The token should be for a User who administers the Lab the Harvester will belong to.
 
-Next, you'll be asked to specify a name for the new Harvester. 
+Next, you'll be asked to specify a name for the new Harvester.
 
 Finally, you'll be asked if you want to monitor a directory.
 If you answer 'yes', you'll be asked for the path to the directory you want to monitor,
@@ -123,7 +123,7 @@ For details on the variables you can set, and when they are necessary, see the [
 
 ## Variable details
 
-If not restarting from a previous configuration, the following variables are required, 
+If not restarting from a previous configuration, the following variables are required,
 and will be prompted for by the wizard if not set (unless `GALV_HARVESTER_SKIP_WIZARD` is set to `true`).
 If `GALV_HARVESTER_SKIP_WIZARD` is set to `true`, you must provide these variables in the environment or the docker-compose file:
 
@@ -163,7 +163,7 @@ This will start the harvester using the previously-configured settings.
 
 ## Harvesting specific files/directories
 
-If you want to harvest specific files or directories, or run the entire harvest cycle manually, 
+If you want to harvest specific files or directories, or run the entire harvest cycle manually,
 you can do so with the command `galv-harvester harvest`.
 
 With no arguments, this will harvest each monitored path in turn.
@@ -174,6 +174,6 @@ You can also specify paths to harvest:
 galv-harvester harvest /path/to/directory /path/to/another/directory/file.csv /path/to/somewhere/else
 ```
 
-This will harvest the specified paths, and only those paths. 
+This will harvest the specified paths, and only those paths.
 **Note**: The paths must be included in the monitored paths for the harvester.
-This includes the regex pattern, if specified. 
+This includes the regex pattern, if specified.

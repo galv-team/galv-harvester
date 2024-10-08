@@ -254,9 +254,12 @@ class MaccorInputFile(InputFile):
                     # value has changed, end range
                     count = numeric_value_counts[column].get(prev_val, -1) + 1
                     numeric_value_counts[column][prev_val] = count
-                    yield f"{column}_{prev_val}_{count}", (
-                        numeric_start[column],
-                        rec_no + 1,
+                    yield (
+                        f"{column}_{prev_val}_{count}",
+                        (
+                            numeric_start[column],
+                            rec_no + 1,
+                        ),
                     )
                     numeric_value[column] = col_val
                     numeric_start[column] = rec_no
@@ -273,9 +276,12 @@ class MaccorInputFile(InputFile):
                     # value has changed, end range
                     count = non_numeric_value_counts[column].get(prev_val, -1) + 1
                     non_numeric_value_counts[column][prev_val] = count
-                    yield f"{column}_{prev_val}_{count}", (
-                        non_numeric_start[column],
-                        rec_no + 1,
+                    yield (
+                        f"{column}_{prev_val}_{count}",
+                        (
+                            non_numeric_start[column],
+                            rec_no + 1,
+                        ),
                     )
                     non_numeric_value[column] = col_val
                     non_numeric_start[column] = rec_no
@@ -287,17 +293,23 @@ class MaccorInputFile(InputFile):
             prev_val = numeric_value[column]
             if numeric_start[column] is not None:
                 count = numeric_value_counts[column].get(prev_val, -1) + 1
-                yield f"{column}_{prev_val}_{count}", (
-                    numeric_start[column],
-                    rec_no + 1,
+                yield (
+                    f"{column}_{prev_val}_{count}",
+                    (
+                        numeric_start[column],
+                        rec_no + 1,
+                    ),
                 )
         for column in non_numeric_columns:
             prev_val = non_numeric_value[column]
             if non_numeric_start[column] is not None:
                 count = non_numeric_value_counts[column].get(prev_val, -1) + 1
-                yield f"{column}_{prev_val}_{count}", (
-                    non_numeric_start[column],
-                    rec_no + 1,
+                yield (
+                    f"{column}_{prev_val}_{count}",
+                    (
+                        non_numeric_start[column],
+                        rec_no + 1,
+                    ),
                 )
 
     def is_maccor_text_file(self, file_path, delimiter):

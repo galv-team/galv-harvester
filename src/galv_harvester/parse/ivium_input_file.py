@@ -212,7 +212,6 @@ class IviumInputFile(InputFile):
                             base_metadata[keys[1]] = key_value[1]
 
                     elif len(keys) == 3:
-
                         base_metadata = ivium_metadata[keys[0]][keys[1]]
                         if keys[0] == "Data Options" and keys[1] == "AnalogInputData":
                             array_index_match = regex_key_array.search(keys[2])

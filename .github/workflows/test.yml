@@ -56,7 +56,7 @@ jobs:
           LIIONSDEN_SMB_USERNAME: ${{ secrets.LIIONSDEN_SMB_USERNAME}}
           LIIONSDEN_SMB_PASSWORD: ${{ secrets.LIIONSDEN_SMB_PASSWORD}}
         run: |
-          sudo mkdir -p $GALV_HARVESTER_TEST_PATH 
+          sudo mkdir -p $GALV_HARVESTER_TEST_PATH
           cd $GALV_HARVESTER_TEST_PATH
           sudo smbget -R $LIIONSDEN_SMB_PATH/test-suite-small -U "$LIIONSDEN_SMB_USERNAME%$LIIONSDEN_SMB_PASSWORD"
 
