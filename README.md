@@ -6,6 +6,7 @@
 
 [![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
 [![Test, Build, and Publish](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml/badge.svg)](https://github.com/galv-team/galv-harvester/actions/workflows/publish.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/galv-team/galv-harvester/develop.svg)](https://results.pre-commit.ci/latest/github/galv-team/galv-harvester/develop)
 
 ## Galv Project
 - [Backend](https://github.com/galv-team/galv-backend)
