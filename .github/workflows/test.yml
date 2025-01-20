@@ -4,14 +4,14 @@ on:
     inputs:
       debug_enabled:
         type: boolean
-        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        description: 'Run the build with debugging enabled (https://github.com/owenthereal/upterm?tab=readme-ov-file#debug-github-actions)'
         required: false
         default: false
   workflow_dispatch:
     inputs:
       debug_enabled:
         type: boolean
-        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        description: 'Run the build with debugging enabled (https://github.com/owenthereal/upterm?tab=readme-ov-file#debug-github-actions)'
         required: false
         default: false
 
@@ -31,23 +31,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Enable tmate debugging of manually-triggered workflows if the input option was provided
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      # Enable debugging of manually-triggered workflows if the input option was provided
+      - name: Setup ssh session
+        uses: owenthereal/action-upterm@v1
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
-
-      # Get the test data
-      - name: Install smbclient
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y smbclient
 
       - name: Restore cached test suite
         id: cache-restore
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
-          key: liionsden-test-suite-small-v1
+          key: liionsden-test-suite-small-v1.3
 
       - name: Download test suite
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -56,9 +50,11 @@ jobs:
           LIIONSDEN_SMB_USERNAME: ${{ secrets.LIIONSDEN_SMB_USERNAME}}
           LIIONSDEN_SMB_PASSWORD: ${{ secrets.LIIONSDEN_SMB_PASSWORD}}
         run: |
+          sudo apt-get update
+          sudo apt-get install -y smbclient
           sudo mkdir -p $GALV_HARVESTER_TEST_PATH
           cd $GALV_HARVESTER_TEST_PATH
-          sudo smbget -R $LIIONSDEN_SMB_PATH/test-suite-small -U "$LIIONSDEN_SMB_USERNAME%$LIIONSDEN_SMB_PASSWORD"
+          sudo smbget --recursive smb://$LIIONSDEN_SMB_PATH/test-suite-small -U "$LIIONSDEN_SMB_USERNAME%$LIIONSDEN_SMB_PASSWORD"
 
       - name: Cache test suite
         id: cache-save
@@ -67,6 +63,9 @@ jobs:
         with:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
+
+      - name: List test files
+        run: ls -la $GALV_HARVESTER_TEST_PATH
 
       # Setup the appropriate Python version, hatch, and the dependencies
       - name: Set up Python ${{ matrix.python-version }}
