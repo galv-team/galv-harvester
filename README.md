@@ -178,3 +178,11 @@ galv-harvester harvest /path/to/directory /path/to/another/directory/file.csv /p
 This will harvest the specified paths, and only those paths.
 **Note**: The paths must be included in the monitored paths for the harvester.
 This includes the regex pattern, if specified.
+
+## Development
+
+This project uses Hatch to manage the package and its dependencies.
+
+### Tests
+
+To run tests, use `hatch env run tests` - this will run the tests in a virtual environment for each supported Python version.
