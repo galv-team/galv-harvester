@@ -36,18 +36,12 @@ jobs:
         uses: mxschmitt/action-tmate@v3
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
 
-      # Get the test data
-      - name: Install smbclient
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y smbclient
-
       - name: Restore cached test suite
         id: cache-restore
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.GALV_HARVESTER_TEST_PATH }}
-          key: liionsden-test-suite-small-v2
+          key: liionsden-test-suite-small-v1.2
 
       - name: Download test suite
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -56,9 +50,11 @@ jobs:
           LIIONSDEN_SMB_USERNAME: ${{ secrets.LIIONSDEN_SMB_USERNAME}}
           LIIONSDEN_SMB_PASSWORD: ${{ secrets.LIIONSDEN_SMB_PASSWORD}}
         run: |
+          sudo apt-get update
+          sudo apt-get install -y smbclient
           sudo mkdir -p $GALV_HARVESTER_TEST_PATH
           cd $GALV_HARVESTER_TEST_PATH
-          sudo smbget -R $LIIONSDEN_SMB_PATH/test-suite-small -U "$LIIONSDEN_SMB_USERNAME%$LIIONSDEN_SMB_PASSWORD"
+          sudo smbget -R smb://$LIIONSDEN_SMB_PATH/test-suite-small -U "$LIIONSDEN_SMB_USERNAME%$LIIONSDEN_SMB_PASSWORD"
 
       - name: Cache test suite
         id: cache-save
