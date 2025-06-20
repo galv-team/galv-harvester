@@ -32,7 +32,6 @@ from .parse.delimited_input_file import DelimitedInputFile
 
 from .api import report_harvest_result, StorageError
 
-from .__about__ import VERSION
 from .plugins import get_parsers
 
 logger = settings.get_logger(__file__)
@@ -321,9 +320,6 @@ class HarvestProcessor:
         )
         data.to_csv(
             self.data_file_name,
-            write_index=False,
-            compute=True,
-            custom_metadata={"galv-harvester-version": VERSION},
         )
         self.row_count = data.shape[0].compute()
         self.partition_count = data.npartitions
