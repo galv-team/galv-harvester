@@ -232,7 +232,7 @@ class HarvestProcessor:
 
     def _prepare_data(self):
         """
-        Read the data from the file and save it as a temporary .parquet file self.data_file
+        Read the data from the file and save it as a temporary .csv file self.data_file
         """
         if self.mapping is None:
             raise RuntimeError(
@@ -277,7 +277,8 @@ class HarvestProcessor:
                 )
             return df
 
-        def partition_generator(generator, partition_line_count=100_000):
+        # Excel maximum rows is just over 1 million
+        def partition_generator(generator, partition_line_count=1_000_000):
             def to_df(rows):
                 return remap(pandas.DataFrame(rows), mapping=self.mapping)
 
@@ -292,9 +293,9 @@ class HarvestProcessor:
                 yield to_df(rows)
 
         partition_line_count = (
-            self.monitored_path.get("max_partition_line_count", 100_000)
+            self.monitored_path.get("max_partition_line_count", 1_000_000)
             if self.monitored_path
-            else 100_000
+            else 1_000_000
         )
 
         reader = self.input_file.load_data(
@@ -314,11 +315,11 @@ class HarvestProcessor:
         # Create a plot of key data columns for identification purposes
         self._plot_png(data)
 
-        # Save the data as parquet
+        # Save the data as csv
         self.data_file_name = os.path.join(
-            tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.parquet"
+            tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.csv"
         )
-        data.to_parquet(
+        data.to_csv(
             self.data_file_name,
             write_index=False,
             compute=True,
@@ -372,11 +373,9 @@ class HarvestProcessor:
         errors = {}
 
         for i in range(self.partition_count):
-            filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.parquet"
-            with open(
-                os.path.join(self.data_file_name, f"part.{i}.parquet"), "rb"
-            ) as f:
-                files = {"parquet_file": (filename, f)}
+            filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.csv"
+            with open(os.path.join(self.data_file_name, f"part.{i}.csv"), "rb") as f:
+                files = {"csv_file": (filename, f)}
                 report = report_harvest_result(
                     path=self.file_path,
                     monitored_path_id=self.monitored_path.get("id"),
@@ -508,6 +507,6 @@ class InternalHarvestProcessor(HarvestProcessor):
                 "Data has not been processed. Run self.process_data() first."
             )
         return [
-            f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.parquet"
+            f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.csv"
             for i in range(self.partition_count)
         ]
