@@ -8,9 +8,9 @@ from unittest.mock import patch
 import os
 from pathlib import Path
 
-import galv_harvester.run
-import galv_harvester.harvest
-from galv_harvester import settings
+import src.galv_harvester.run
+import src.galv_harvester.harvest
+from src.galv_harvester import settings
 
 
 def get_test_file_path():
@@ -57,11 +57,11 @@ def fail(e, *kwargs):
 
 class TestHarvester(unittest.TestCase):
     @patch("requests.get")
-    @patch("galv_harvester.api.logger")
-    @patch("galv_harvester.run.logger")
-    @patch("galv_harvester.api.get_settings_file")
-    @patch("galv_harvester.settings.get_settings_file")
-    @patch("galv_harvester.settings.get_logfile")
+    @patch("src.galv_harvester.api.logger")
+    @patch("src.galv_harvester.run.logger")
+    @patch("src.galv_harvester.api.get_settings_file")
+    @patch("src.galv_harvester.settings.get_settings_file")
+    @patch("src.galv_harvester.settings.get_logfile")
     def test_config_update(
         self,
         mock_settings_log,
@@ -80,7 +80,7 @@ class TestHarvester(unittest.TestCase):
             mock_api_logger.error = fail
             mock_run_logger.error = fail
             mock_get.return_value = ConfigResponse()
-            galv_harvester.run.update_config()
+            src.galv_harvester.run.update_config()
             if not os.path.isfile(mock_settings_file()):
                 raise AssertionError(
                     f"Expected JSON file '{mock_settings_file()}' not found"
@@ -88,10 +88,10 @@ class TestHarvester(unittest.TestCase):
 
             os.remove(mock_settings_file())
 
-    @patch("galv_harvester.run.report_harvest_result")
-    @patch("galv_harvester.run.HarvestProcessor", autospec=True)
-    @patch("galv_harvester.run.logger")
-    @patch("galv_harvester.settings.get_settings")
+    @patch("src.galv_harvester.run.report_harvest_result")
+    @patch("src.galv_harvester.run.HarvestProcessor", autospec=True)
+    @patch("src.galv_harvester.run.logger")
+    @patch("src.galv_harvester.settings.get_settings")
     def test_harvest_path(
         self, mock_settings, mock_logger, mock_processor, mock_report
     ):
@@ -103,7 +103,9 @@ class TestHarvester(unittest.TestCase):
         )
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(200, {"state": "STABLE"})
-        galv_harvester.run.harvest_path(ConfigResponse().json()["monitored_paths"][0])
+        src.galv_harvester.run.harvest_path(
+            ConfigResponse().json()["monitored_paths"][0]
+        )
         files = []
         expected_file_count = 11
         for c in mock_processor.call_args_list:
@@ -131,9 +133,9 @@ class TestHarvester(unittest.TestCase):
 
     @patch("requests.post")
     @patch("requests.get")
-    @patch("galv_harvester.harvest.report_harvest_result")
-    @patch("galv_harvester.harvest.logger")
-    @patch("galv_harvester.settings.get_settings")
+    @patch("src.galv_harvester.harvest.report_harvest_result")
+    @patch("src.galv_harvester.harvest.logger")
+    @patch("src.galv_harvester.settings.get_settings")
     def _import_file(
         self,
         mock_settings,
@@ -143,8 +145,9 @@ class TestHarvester(unittest.TestCase):
         mock_post,
         filename=None,
         additional_checks=None,
+        settings_json=None,
     ):
-        mock_settings.return_value = ConfigResponse().json()
+        mock_settings.return_value = settings_json or ConfigResponse().json()
         mock_logger.error = fail
         mock_report.return_value = JSONResponse(
             200,
@@ -153,16 +156,20 @@ class TestHarvester(unittest.TestCase):
         )
         mock_get.return_value = JSONResponse(200, {"rendered_map": {}})
         mock_post.return_value = JSONResponse(204, {})
-        galv_harvester.harvest.HarvestProcessor(
+        src.galv_harvester.harvest.HarvestProcessor(
             os.path.join(get_test_file_path(), filename),
-            ConfigResponse().json()["monitored_paths"][0],
+            mock_settings.return_value["monitored_paths"][0],
         ).harvest()
         self.validate_report_calls(mock_report.call_args_list)
         if additional_checks:
             additional_checks(mock_report.call_args_list)
 
-    def import_file(self, filename, additional_checks=None):
-        self._import_file(filename=filename, additional_checks=additional_checks)
+    def import_file(self, filename, additional_checks=None, settings_json=None):
+        self._import_file(
+            filename=filename,
+            additional_checks=additional_checks,
+            settings_json=settings_json,
+        )
 
     def validate_report_calls(self, calls):
         stages = [
@@ -305,6 +312,24 @@ class TestHarvester(unittest.TestCase):
             raise AssertionError(f"Could not find import report with {cols} columns")
 
         self.import_file("arbin.csv", validate_column_count)
+
+    def test_import_arbin_multifile(self):
+        def validate_file_count(calls):
+            filtered_calls = []
+            for c in calls:
+                try:
+                    filtered_calls.append(c.kwargs["data"]["filename"])
+                except KeyError:
+                    pass
+            if len(filtered_calls) != 3:
+                raise AssertionError(
+                    f"Expected 3 calls for arbin import, got {', '.join(filtered_calls)}"
+                )
+
+        settings_json = ConfigResponse().json()
+        settings_json["monitored_paths"][0]["max_partition_line_count"] = 10
+
+        self.import_file("arbin.csv", validate_file_count, settings_json)
 
 
 if __name__ == "__main__":

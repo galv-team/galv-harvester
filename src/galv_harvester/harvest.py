@@ -316,7 +316,8 @@ class HarvestProcessor:
 
         # Save the data as csv
         self.data_file_name = os.path.join(
-            tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.csv"
+            tempfile.gettempdir(),
+            f"{os.path.splitext(os.path.basename(self.file_path))[0]}.csv",
         )
         data.to_csv(
             self.data_file_name,
@@ -369,9 +370,18 @@ class HarvestProcessor:
         errors = {}
 
         for i in range(self.partition_count):
-            filename = f"{os.path.splitext(os.path.basename(self.file_path))[0]}.part_{self.pad0(i)}.csv"
-            with open(os.path.join(self.data_file_name, f"part.{i}.csv"), "rb") as f:
-                files = {"csv_file": (filename, f)}
+            read_path = os.path.join(
+                f"{os.path.splitext(self.data_file_name)[0]}.csv",
+                f"{self.pad0(i)}.part",
+            )
+            if self.partition_count == 1:
+                write_path = (
+                    f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.csv"
+                )
+            else:
+                write_path = f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.part_{self.pad0(i)}.csv"
+            with open(read_path, "r") as f:
+                files = {"csv_file": (write_path, f)}
                 report = report_harvest_result(
                     path=self.file_path,
                     monitored_path_id=self.monitored_path.get("id"),
@@ -387,22 +397,22 @@ class HarvestProcessor:
                         "total_row_count": self.row_count,
                         "partition_number": i,
                         "partition_count": self.partition_count,
-                        "filename": filename,
+                        "filename": write_path,
                     },
                     files=files,
                 )
             if report is None:
                 errors[i] = (
-                    f"Failed to upload {filename} - API Error: no response from server"
+                    f"Failed to upload {write_path} - API Error: no response from server"
                 )
             elif not report.ok:
                 try:
                     errors[i] = (
-                        f"Failed to upload {filename} - API responded with Error: {report.json()['error']}"
+                        f"Failed to upload {write_path} - API responded with Error: {report.json()['error']}"
                     )
                 except BaseException:
                     errors[i] = (
-                        f"Failed to upload {filename}. Received HTTP {report.status_code}"
+                        f"Failed to upload {write_path}. Received HTTP {report.status_code}"
                     )
             else:
                 successes += 1
