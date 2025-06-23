@@ -53,6 +53,7 @@ class HarvestProcessor:
     mapping = None
     png_file_name = None
     data_file_name = None
+    tmp_dir = None
     row_count = None
     partition_count = None
     parser_errors = {}
@@ -72,6 +73,7 @@ class HarvestProcessor:
     def __init__(self, file_path: str, monitored_path: Optional[dict]):
         self.mapping = None
         self.file_path = file_path
+        self.tmp_dir = tempfile.mkdtemp(prefix="galv_h_")
         self.monitored_path = monitored_path
         self.parser_classes = [*get_parsers(), *self.default_parsers]
         for input_file_cls in self.default_parsers:
@@ -316,7 +318,7 @@ class HarvestProcessor:
 
         # Save the data as csv
         self.data_file_name = os.path.join(
-            tempfile.gettempdir(),
+            self.tmp_dir,
             f"{os.path.splitext(os.path.basename(self.file_path))[0]}",
         )
         data.to_csv(self.data_file_name, index=False)
@@ -338,7 +340,8 @@ class HarvestProcessor:
         """
         try:
             self.png_file_name = os.path.join(
-                tempfile.gettempdir(), f"{os.path.basename(self.file_path)}.png"
+                self.tmp_dir,
+                f"{os.path.splitext(os.path.basename(self.file_path))[0]}.png",
             )
             hd.shade.cmap = ["lightblue", "darkblue"]
             hv.extension("matplotlib")
@@ -438,7 +441,7 @@ class HarvestProcessor:
         """
         Delete temporary files created during the process
         """
-        for attribute in ["data_file_name", "png_file_name"]:
+        for attribute in ["data_file_name", "png_file_name", "tmp_dir"]:
             if hasattr(self, attribute):
                 filename = getattr(self, attribute)
                 if filename is not None and os.path.exists(filename):

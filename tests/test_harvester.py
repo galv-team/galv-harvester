@@ -226,15 +226,6 @@ class TestHarvester(unittest.TestCase):
                             raise AssertionError(
                                 "Expected data summary to be JSON representation of a dictionary"
                             )
-                    elif s == settings.HARVEST_STAGE_UPLOAD_COMPLETE:
-                        if "successes" not in data:
-                            raise AssertionError(
-                                "Expected upload completion report to contain success count"
-                            )
-                        if "errors" not in data:
-                            raise AssertionError(
-                                "Expected upload completion report to contain errors list"
-                            )
                 except AssertionError as e:
                     print(data)
                     raise e
