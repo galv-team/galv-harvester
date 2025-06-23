@@ -54,6 +54,7 @@ class HarvestProcessor:
     png_file_name = None
     data_file_name = None
     tmp_dir = None
+    zip_file = None
     row_count = None
     partition_count = None
     parser_errors = {}
@@ -325,6 +326,32 @@ class HarvestProcessor:
         self.row_count = data.shape[0].compute()
         self.partition_count = data.npartitions
 
+        # Rename part files to match the expected format
+        if self.partition_count == 1:
+            shutil.move(
+                os.path.join(self.data_file_name, "0.part"),
+                os.path.join(
+                    self.data_file_name,
+                    f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.csv",
+                ),
+            )
+        else:
+            for i in range(self.partition_count):
+                part_file = os.path.join(self.data_file_name, f"{self.pad0(i)}.part")
+                new_part_file = os.path.join(
+                    self.data_file_name, f"{self.pad0(i)}.part_{self.pad0(i)}.csv"
+                )
+                shutil.move(part_file, new_part_file)
+                logger.debug(f"Renamed {part_file} to {new_part_file}")
+
+        # Zip data to reduce upload size
+        self.zip_file = shutil.make_archive(
+            self.data_file_name,
+            "zip",
+            self.data_file_name,
+            logger=logger,
+        )
+
     def process_data(self):
         """
         Process the data in the file.
@@ -366,56 +393,30 @@ class HarvestProcessor:
         """
         Upload the data to the server
         """
-
-        # Rename part files to match the expected format
-        if self.partition_count == 1:
-            shutil.move(
-                os.path.join(self.data_file_name, "0.part"),
-                os.path.join(
-                    self.data_file_name,
-                    f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.csv",
-                ),
+        with open(self.zip_file, "rb") as f:
+            report = report_harvest_result(
+                path=self.file_path,
+                monitored_path_id=self.monitored_path.get("id"),
+                # send data in a flat format to accompany file upload protocol.
+                # Kinda hacky because it overwrites much of report_harvest_result's functionality
+                data={
+                    "format": "flat",
+                    "status": settings.HARVESTER_STATUS_SUCCESS,
+                    "path": self.file_path,
+                    "monitored_path_id": self.monitored_path.get("id"),
+                    "task": settings.HARVESTER_TASK_IMPORT,
+                    "stage": settings.HARVEST_STAGE_UPLOAD_DATA,
+                    "total_row_count": self.row_count,
+                    "filename": self.zip_file,
+                },
+                files={"zip_file": f},
             )
-        else:
-            for i in range(self.partition_count):
-                part_file = os.path.join(self.data_file_name, f"{self.pad0(i)}.part")
-                new_part_file = os.path.join(
-                    self.data_file_name, f"{self.pad0(i)}.part_{self.pad0(i)}.csv"
-                )
-                shutil.move(part_file, new_part_file)
-                logger.debug(f"Renamed {part_file} to {new_part_file}")
-
-        # Zip data to reduce upload size
-        zip_file = shutil.make_archive(
-            self.data_file_name,
-            "zip",
-            self.data_file_name,
-            logger=logger,
-        )
-        report = report_harvest_result(
-            path=self.file_path,
-            monitored_path_id=self.monitored_path.get("id"),
-            # send data in a flat format to accompany file upload protocol.
-            # Kinda hacky because it overwrites much of report_harvest_result's functionality
-            data={
-                "format": "flat",
-                "status": settings.HARVESTER_STATUS_SUCCESS,
-                "path": self.file_path,
-                "monitored_path_id": self.monitored_path.get("id"),
-                "task": settings.HARVESTER_TASK_IMPORT,
-                "stage": settings.HARVEST_STAGE_UPLOAD_DATA,
-                "total_row_count": self.row_count,
-                "filename": zip_file,
-            },
-            files=[zip_file],
-        )
-        if report is None:
-            raise RuntimeError("API Error: no response from server")
-        logger.info("Data Upload - success")
+            if report is None:
+                raise RuntimeError("API Error: no response from server")
+            logger.info("Data Upload - success")
 
         if self.png_ok:
             with open(self.png_file_name, "rb") as f:
-                files = {"png_file": f}
                 report = report_harvest_result(
                     path=self.file_path,
                     monitored_path_id=self.monitored_path.get("id"),
@@ -430,7 +431,7 @@ class HarvestProcessor:
                         "stage": settings.HARVEST_STAGE_UPLOAD_PNG,
                         "filename": os.path.basename(self.png_file_name),
                     },
-                    files=files,
+                    files={"png_file": f},
                 )
             try:
                 HarvestProcessor.check_response("Upload PNG", report)
