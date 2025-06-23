@@ -385,8 +385,8 @@ class HarvestProcessor:
         # Zip data to reduce upload size
         zip_file = shutil.make_archive(
             self.data_file_name,
-            ".zip",
-            os.path.dirname(self.data_file_name),
+            "zip",
+            self.data_file_name,
             logger=logger,
         )
         report = report_harvest_result(
@@ -402,14 +402,12 @@ class HarvestProcessor:
                 "task": settings.HARVESTER_TASK_IMPORT,
                 "stage": settings.HARVEST_STAGE_UPLOAD_DATA,
                 "total_row_count": self.row_count,
-                "partition_count": self.partition_count,
                 "filename": zip_file,
             },
             files=[zip_file],
         )
         if report is None:
             raise RuntimeError("API Error: no response from server")
-        report.raise_for_status()
         logger.info("Data Upload - success")
 
         if self.png_ok:

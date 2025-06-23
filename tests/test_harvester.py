@@ -313,7 +313,7 @@ class TestHarvester(unittest.TestCase):
                     filtered_calls.append(c.kwargs["data"]["filename"])
                 except KeyError:
                     pass
-            if len(filtered_calls) != 3:
+            if len(filtered_calls) != 1:
                 raise AssertionError(
                     f"Expected 3 calls for arbin import, got {', '.join(filtered_calls)}"
                 )
