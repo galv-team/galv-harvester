@@ -17,7 +17,7 @@ The Harvester runs on a simple loop.
          3. *The server may respond with a mapping object, used to rename/rescale columns.*
          4. If no mapping object is returned, the file is left for later (user input required on the server side).
          5. The file contents are loaded into a Dask dataframe, and the mapping object is applied.
-         6. **The dataframe is uploaded to the server as .parquet files.**
+         6. **The dataframe is uploaded to the server as zipped .csv files.**
          7. Temporary files are deleted.
 
 ## Mapping object
@@ -38,11 +38,3 @@ which are coerced using `pd.to_datetime(x)`.
 
 Numerical (int/float) columns will be rebased and rescaled according to the `multiplier` and `addition` fields.
 New column values = (old column values + `addition`) * `multiplier`.
-
-**Columns that are not in the mapping object are converted to float.**
-This is to save space. While parquet files can handle strings fairly well,
-they are not efficient at storing strings that are mostly numbers because
-they are stored using a dictionary encoding suited to reoccurring strings.
-
-This means that, if a numeric column is not in the mapping object and we store it as a string,
-we will be storing many slightly different strings, which is inefficient.

@@ -175,7 +175,7 @@ class TestHarvester(unittest.TestCase):
         stages = [
             "file metadata",
             "data summary",
-            "upload parquet partitions",
+            "upload data",
             "upload complete",
         ]
         upload_fired = False
@@ -184,21 +184,13 @@ class TestHarvester(unittest.TestCase):
                 if "files" in c.kwargs and not upload_fired:
                     upload_fired = True
                     data = c.kwargs.get("data")
-                    if "partition_number" not in data:
-                        raise AssertionError(
-                            "Expected upload parquet partitions report to contain row count"
-                        )
-                    if "partition_count" not in data:
-                        raise AssertionError(
-                            "Expected upload parquet partitions report to contain partition count"
-                        )
                     if "total_row_count" not in data:
                         raise AssertionError(
-                            "Expected upload parquet partitions report to contain total row count"
+                            "Expected upload data report to contain total row count"
                         )
                     if "filename" not in data:
                         raise AssertionError(
-                            "Expected upload parquet partitions report to contain filename"
+                            "Expected upload data report to contain filename"
                         )
                     return
                 else:

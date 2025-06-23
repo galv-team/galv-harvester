@@ -317,11 +317,9 @@ class HarvestProcessor:
         # Save the data as csv
         self.data_file_name = os.path.join(
             tempfile.gettempdir(),
-            f"{os.path.splitext(os.path.basename(self.file_path))[0]}.csv",
+            f"{os.path.splitext(os.path.basename(self.file_path))[0]}",
         )
-        data.to_csv(
-            self.data_file_name,
-        )
+        data.to_csv(self.data_file_name, index=False)
         self.row_count = data.shape[0].compute()
         self.partition_count = data.npartitions
 
@@ -366,79 +364,53 @@ class HarvestProcessor:
         Upload the data to the server
         """
 
-        successes = 0
-        errors = {}
-
-        for i in range(self.partition_count):
-            read_path = os.path.join(
-                f"{os.path.splitext(self.data_file_name)[0]}.csv",
-                f"{self.pad0(i)}.part",
+        # Rename part files to match the expected format
+        if self.partition_count == 1:
+            shutil.move(
+                os.path.join(self.data_file_name, "0.part"),
+                os.path.join(
+                    self.data_file_name,
+                    f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.csv",
+                ),
             )
-            if self.partition_count == 1:
-                write_path = (
-                    f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.csv"
-                )
-            else:
-                write_path = f"{os.path.splitext(os.path.basename(self.data_file_name))[0]}.part_{self.pad0(i)}.csv"
-            with open(read_path, "r") as f:
-                files = {"csv_file": (write_path, f)}
-                report = report_harvest_result(
-                    path=self.file_path,
-                    monitored_path_id=self.monitored_path.get("id"),
-                    # send data in a flat format to accompany file upload protocol.
-                    # Kinda hacky because it overwrites much of report_harvest_result's functionality
-                    data={
-                        "format": "flat",
-                        "status": settings.HARVESTER_STATUS_SUCCESS,
-                        "path": self.file_path,
-                        "monitored_path_id": self.monitored_path.get("id"),
-                        "task": settings.HARVESTER_TASK_IMPORT,
-                        "stage": settings.HARVEST_STAGE_UPLOAD_PARQUET,
-                        "total_row_count": self.row_count,
-                        "partition_number": i,
-                        "partition_count": self.partition_count,
-                        "filename": write_path,
-                    },
-                    files=files,
-                )
-            if report is None:
-                errors[i] = (
-                    f"Failed to upload {write_path} - API Error: no response from server"
-                )
-            elif not report.ok:
-                try:
-                    errors[i] = (
-                        f"Failed to upload {write_path} - API responded with Error: {report.json()['error']}"
-                    )
-                except BaseException:
-                    errors[i] = (
-                        f"Failed to upload {write_path}. Received HTTP {report.status_code}"
-                    )
-            else:
-                successes += 1
-
-        if successes == 0 and self.partition_count > 0:
-            raise RuntimeError("API Error: failed to upload all partitions to server")
-        if successes != self.partition_count:
-            logger.error(
-                f"Data Upload - {successes} of {self.partition_count} partitions uploaded successfully"
-            )
-            for filename, error in errors.items():
-                logger.error(
-                    f"Data Upload - Partition {filename} failed with error: {error}"
-                )
         else:
-            logger.info(f"Data Upload - {successes} partitions uploaded successfully")
+            for i in range(self.partition_count):
+                part_file = os.path.join(self.data_file_name, f"{self.pad0(i)}.part")
+                new_part_file = os.path.join(
+                    self.data_file_name, f"{self.pad0(i)}.part_{self.pad0(i)}.csv"
+                )
+                shutil.move(part_file, new_part_file)
+                logger.debug(f"Renamed {part_file} to {new_part_file}")
 
-        report_harvest_result(
+        # Zip data to reduce upload size
+        zip_file = shutil.make_archive(
+            self.data_file_name,
+            ".zip",
+            os.path.dirname(self.data_file_name),
+            logger=logger,
+        )
+        report = report_harvest_result(
             path=self.file_path,
             monitored_path_id=self.monitored_path.get("id"),
-            content={
+            # send data in a flat format to accompany file upload protocol.
+            # Kinda hacky because it overwrites much of report_harvest_result's functionality
+            data={
+                "format": "flat",
+                "status": settings.HARVESTER_STATUS_SUCCESS,
+                "path": self.file_path,
+                "monitored_path_id": self.monitored_path.get("id"),
                 "task": settings.HARVESTER_TASK_IMPORT,
-                "stage": settings.HARVEST_STAGE_UPLOAD_COMPLETE,
-                "data": {"successes": successes, "errors": errors},
+                "stage": settings.HARVEST_STAGE_UPLOAD_DATA,
+                "total_row_count": self.row_count,
+                "partition_count": self.partition_count,
+                "filename": zip_file,
             },
+            files=[zip_file],
         )
+        if report is None:
+            raise RuntimeError("API Error: no response from server")
+        report.raise_for_status()
+        logger.info("Data Upload - success")
 
         if self.png_ok:
             with open(self.png_file_name, "rb") as f:

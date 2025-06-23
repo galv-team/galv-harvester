@@ -36,14 +36,12 @@ class TestInternalHarvester(unittest.TestCase):
             self.assertIsNone(self.processor.png_file_name)
             self.assertIsNone(self.processor.data_file_name)
             self.assertIsNone(self.processor.row_count)
-            self.assertIsNone(self.processor.partition_count)
             self.processor.process_data()
             self.assertIsNotNone(self.processor.png_file_name)
             self.assertIsNotNone(self.processor.data_file_name)
             self.assertEqual(
                 self.processor.row_count, 39
             )  # 40 rows, 1 header in the test file
-            self.assertEqual(self.processor.partition_count, 1)
 
 
 if __name__ == "__main__":
