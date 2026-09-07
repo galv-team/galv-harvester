@@ -2,14 +2,14 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 import json
+import os
 import tempfile
 import unittest
-from unittest.mock import patch
-import os
 from pathlib import Path
+from unittest.mock import patch
 
-import galv_harvester.run
 import galv_harvester.harvest
+import galv_harvester.run
 from galv_harvester import settings
 
 

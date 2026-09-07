@@ -2,15 +2,16 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
-import os
 import ntpath
+import os
 import re
 from datetime import datetime
-from .input_file import InputFile
+
 from .exceptions import (
-    UnsupportedFileTypeError,
     InvalidDataInFileError,
+    UnsupportedFileTypeError,
 )
+from .input_file import InputFile
 
 IDF_HEADER = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfb\x00\x00\x00\r\x00Version=11"
 
@@ -49,9 +50,7 @@ class IviumInputFile(InputFile):
                 if len(line) != 40:
                     self.logger.debug(line)
                     raise InvalidDataInFileError(
-                        ("Incorrect line length on line {} was {} expected {}").format(
-                            current_line, len(line), 40
-                        )
+                        f"Incorrect line length on line {current_line} was {len(line)} expected {40}"
                     )
                 row = [line[:12].strip(), line[13:25].strip(), line[26:].strip()]
                 yield {
@@ -91,9 +90,7 @@ class IviumInputFile(InputFile):
             elif end == "select":
                 continue
             else:
-                raise UnsupportedFileTypeError(
-                    "task end condition {} unknown".format(end)
-                )
+                raise UnsupportedFileTypeError(f"task end condition {end} unknown")
 
         def is_end_task(row):
             is_end = False
@@ -197,9 +194,7 @@ class IviumInputFile(InputFile):
                                 base_metadata[index][key] = key_value[1]
                             else:
                                 raise UnsupportedFileTypeError(
-                                    "unexpected array index {} for line {}".format(
-                                        index, line
-                                    )
+                                    f"unexpected array index {index} for line {line}"
                                 )
                         elif keys[0] == "Data Options" and keys[1] == "AnalogInputData":
                             base_metadata[keys[1]] = [
@@ -306,4 +301,4 @@ class IviumInputFile(InputFile):
         with open(file_path, "rb") as f:
             line = f.readline()
             if not line.startswith(IDF_HEADER):
-                raise UnsupportedFileTypeError("incorrect header - {}".format(line))
+                raise UnsupportedFileTypeError(f"incorrect header - {line}")

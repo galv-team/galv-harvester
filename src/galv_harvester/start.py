@@ -10,11 +10,11 @@ import time
 
 import click
 import requests
-
-from galv_harvester.settings import logger
 from requests import Response
 
-from . import run, settings, api
+from galv_harvester.settings import logger
+
+from . import api, run, settings
 
 
 def check_response_ok(response: Response):
