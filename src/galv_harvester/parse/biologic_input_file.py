@@ -2,9 +2,11 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
-import os
 import ntpath
+import os
+
 from galvani import BioLogic
+
 from .exceptions import UnsupportedFileTypeError
 from .input_file import InputFile
 

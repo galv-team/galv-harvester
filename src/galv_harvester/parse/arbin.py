@@ -3,6 +3,7 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import csv
+
 from .exceptions import UnsupportedFileTypeError
 from .input_file import InputFile
 
