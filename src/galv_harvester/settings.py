@@ -3,10 +3,10 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import json
-import os
-import pathlib
 import logging
 import logging.handlers
+import os
+import pathlib
 
 from click import get_current_context
 
