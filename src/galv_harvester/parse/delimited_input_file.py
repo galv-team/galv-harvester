@@ -3,6 +3,7 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import csv
+
 from .exceptions import UnsupportedFileTypeError
 from .input_file import InputFile
 
@@ -70,9 +71,7 @@ class DelimitedInputFile(InputFile):
                     last_line += 1
                     if last_line > max_header_lines:
                         raise UnsupportedFileTypeError(
-                            (
-                                f"Could not determine delimiter and header status after {max_header_lines} lines."
-                            )
+                            f"Could not determine delimiter and header status after {max_header_lines} lines."
                         )
                     continue
 
@@ -94,10 +93,8 @@ class DelimitedInputFile(InputFile):
                     break
                 except Exception as e:
                     raise UnsupportedFileTypeError(
-                        (
-                            f"Identified delimiter [{self.dialect.delimiter}] after {last_line} lines,"
-                            f" but could not use `next(reader)`."
-                        )
+                        f"Identified delimiter [{self.dialect.delimiter}] after {last_line} lines,"
+                        f" but could not use `next(reader)`."
                     ) from e
 
         super().__init__(file_path, **kwargs)

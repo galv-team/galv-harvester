@@ -2,8 +2,8 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
-from .exceptions import UnsupportedFileTypeError
 from ..settings import get_logger
+from .exceptions import UnsupportedFileTypeError
 
 # see https://gist.github.com/jsheedy/ed81cdf18190183b3b7d
 # https://stackoverflow.com/a/30721460
