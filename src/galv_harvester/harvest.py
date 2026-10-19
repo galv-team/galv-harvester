@@ -3,36 +3,33 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import datetime
-
+import math
+import os
+import shutil
 import tempfile
 import time
 from typing import Optional
 
 import dask.dataframe
-import pandas
 import fastnumbers
-import math
-import os
-import shutil
-import requests
 import holoviews as hv
 import holoviews.operation.datashader as hd
+import pandas
+import requests
 
 from . import settings
+from .__about__ import VERSION
+from .api import StorageError, report_harvest_result
 from .parse.arbin import ArbinCSVFile
+from .parse.biologic_input_file import BiologicMprInputFile
+from .parse.delimited_input_file import DelimitedInputFile
 from .parse.exceptions import UnsupportedFileTypeError
 from .parse.ivium_input_file import IviumInputFile
-from .parse.biologic_input_file import BiologicMprInputFile
 from .parse.maccor_input_file import (
-    MaccorInputFile,
     MaccorExcelInputFile,
+    MaccorInputFile,
     MaccorRawInputFile,
 )
-from .parse.delimited_input_file import DelimitedInputFile
-
-from .api import report_harvest_result, StorageError
-
-from .__about__ import VERSION
 from .plugins import get_parsers
 
 logger = settings.get_logger(__file__)
@@ -77,7 +74,7 @@ class HarvestProcessor:
         self.parser_classes = [*get_parsers(), *self.default_parsers]
         for input_file_cls in self.default_parsers:
             try:
-                logger.debug("Tried input reader {}".format(input_file_cls))
+                logger.debug(f"Tried input reader {input_file_cls}")
                 input_file = input_file_cls(file_path=file_path)
             except UnsupportedFileTypeError as e:
                 self.parser_errors[input_file_cls.__name__] = e
@@ -85,10 +82,8 @@ class HarvestProcessor:
                 continue
             except Exception as e:
                 logger.error(
-                    (
-                        f"{input_file_cls.__name__} failed to import"
-                        f" {file_path} with non-UnsupportedFileTypeError: {e}"
-                    )
+                    f"{input_file_cls.__name__} failed to import"
+                    f" {file_path} with non-UnsupportedFileTypeError: {e}"
                 )
                 continue
             logger.debug("...succeeded...")
