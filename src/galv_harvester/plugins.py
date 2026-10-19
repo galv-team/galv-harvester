@@ -2,8 +2,8 @@ import importlib
 import pkgutil
 
 from galv_harvester.parse.input_file import InputFile
-from .settings import get_logger
 
+from .settings import get_logger
 
 logger = get_logger(__file__)
 _cached_parsers = None
