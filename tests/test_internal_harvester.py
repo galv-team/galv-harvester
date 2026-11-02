@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
-import unittest
 import os
+import unittest
 
 import pandas
+
 from galv_harvester.harvest import InternalHarvestProcessor
 from tests.test_harvester import get_test_file_path
 

@@ -2,16 +2,18 @@
 # Copyright  (c) 2020-2023, The Chancellor, Masters and Scholars of the University
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
-import os
 import csv
 import ntpath
+import os
 import re
 from datetime import datetime
-import xlrd
+
 import maya
-from .input_file import InputFile
-from .exceptions import UnsupportedFileTypeError, EmptyFileError, InvalidDataInFileError
+import xlrd
+
 from ..settings import get_logger
+from .exceptions import EmptyFileError, InvalidDataInFileError, UnsupportedFileTypeError
+from .input_file import InputFile
 
 
 class MaccorInputFile(InputFile):
@@ -43,7 +45,7 @@ class MaccorInputFile(InputFile):
         column_is_numeric = [isfloat(column) for column in first_data]
         self.logger.debug(column_is_numeric)
         numeric_columns = []
-        for i in range(0, len(column_is_numeric)):
+        for i in range(len(column_is_numeric)):
             if column_is_numeric[i]:
                 numeric_columns.append(i)
             else:
@@ -81,7 +83,7 @@ class MaccorInputFile(InputFile):
                 "has_data": column_has_data[i],
                 "is_numeric": column_is_numeric[i],
             }
-            for i in range(0, len(headers))
+            for i in range(len(headers))
         }
 
         # add unit info for known columns
@@ -111,7 +113,7 @@ class MaccorInputFile(InputFile):
             first_rec = int(first_data[recno_col])
             last_rec = int(row[recno_col])
         self.logger.debug(column_info)
-        self.logger.debug("Num rows {}".format(total_rows))
+        self.logger.debug(f"Num rows {total_rows}")
         return column_info, total_rows, first_rec, last_rec
 
     def load_metadata(self):
@@ -216,7 +218,7 @@ class MaccorInputFile(InputFile):
                     cyc_no_start = rec_no
                 elif cyc_no < row_cyc:
                     # on a new cycle
-                    yield "cycle_{}".format(cyc_no), (cyc_no_start, rec_no + 1)
+                    yield f"cycle_{cyc_no}", (cyc_no_start, rec_no + 1)
                     cyc_no = row_cyc
                     cyc_no_start = rec_no
             elif "Amps" in row:
@@ -230,12 +232,12 @@ class MaccorInputFile(InputFile):
                 if cyc_begin:
                     cyc_amps = 1
                     if cyc_no_start is not None:
-                        yield "cycle_{}".format(cyc_no), (cyc_no_start, rec_no + 1)
+                        yield f"cycle_{cyc_no}", (cyc_no_start, rec_no + 1)
                     cyc_no_start = rec_no
                     cyc_no = 0 if cyc_no is None else cyc_no + 1
                 # a <0 to 0 change
                 elif cyc_end:  # cycle ended at zero amps, not start of a new cycle
-                    yield "cycle_{}".format(cyc_no), (cyc_no_start, rec_no + 1)
+                    yield f"cycle_{cyc_no}", (cyc_no_start, rec_no + 1)
                     cyc_no_start = None
                     cyc_amps = 0
                 elif cyc_mid:
@@ -288,7 +290,7 @@ class MaccorInputFile(InputFile):
 
         # return any partial ranges
         if cyc_no_start is not None:
-            yield "cycle_{}".format(cyc_no), (cyc_no_start, rec_no + 1)
+            yield f"cycle_{cyc_no}", (cyc_no_start, rec_no + 1)
         for column in numeric_columns:
             prev_val = numeric_value[column]
             if numeric_start[column] is not None:
@@ -366,7 +368,7 @@ class MaccorExcelInputFile(MaccorInputFile):
         Identifies columns in a maccor excel file"
         """
         sheet = wbook.sheet_by_index(0)
-        column_has_data = [False for col in range(0, sheet.ncols)]
+        column_has_data = [False for col in range(sheet.ncols)]
         headers = []
         numeric_columns = []
         column_is_numeric = []
@@ -374,7 +376,7 @@ class MaccorExcelInputFile(MaccorInputFile):
             headers_row = 1
         else:
             headers_row = 0
-        for col in range(0, sheet.ncols):
+        for col in range(sheet.ncols):
             headers.append(sheet.cell_value(headers_row, col))
             is_numeric = isfloat(sheet.cell_value(headers_row + 1, col))
             column_is_numeric.append(is_numeric)
@@ -382,8 +384,8 @@ class MaccorExcelInputFile(MaccorInputFile):
                 numeric_columns.append(col)
             else:
                 column_has_data[col] = True
-        self.logger.debug("headers: {}".format(headers))
-        self.logger.debug("numeric_columns: {}".format(numeric_columns))
+        self.logger.debug(f"headers: {headers}")
+        self.logger.debug(f"numeric_columns: {numeric_columns}")
         try:
             recno_col = headers.index("Rec#")
             first_rec = sheet.cell_value(headers_row + 1, recno_col)
@@ -391,7 +393,7 @@ class MaccorExcelInputFile(MaccorInputFile):
             # Don't have record numbers, make them up
             first_rec = 1
         total_rows = 0
-        for sheet_id in range(0, wbook.nsheets):
+        for sheet_id in range(wbook.nsheets):
             self.logger.debug("Loading sheet... " + str(sheet_id))
             sheet = wbook.sheet_by_index(sheet_id)
             total_rows += sheet.nrows - 1 - int(self._has_metadata_row)
@@ -401,11 +403,7 @@ class MaccorExcelInputFile(MaccorInputFile):
                         column_has_data[column] = True
                         numeric_columns.remove(column)
                         self.logger.debug(
-                            "Found data in col {} ( {} ) : {}".format(
-                                column,
-                                headers[column],
-                                float(sheet.cell_value(row, column)),
-                            )
+                            f"Found data in col {column} ( {headers[column]} ) : {float(sheet.cell_value(row, column))}"
                         )
             if sheet.nrows > 2:
                 # update this each time there is a valid answer since we don't know for
@@ -424,10 +422,10 @@ class MaccorExcelInputFile(MaccorInputFile):
                 "has_data": column_has_data[i],
                 "is_numeric": column_is_numeric[i],
             }
-            for i in range(0, len(headers))
+            for i in range(len(headers))
         }
         self.logger.debug(column_info)
-        self.logger.debug("Num rows {}".format(total_rows))
+        self.logger.debug(f"Num rows {total_rows}")
         return column_info, total_rows, first_rec, last_rec
 
     def load_data(self, file_path, columns, column_renames=None):
@@ -446,7 +444,7 @@ class MaccorExcelInputFile(MaccorInputFile):
             columns_of_interest = []
             column_names = []
             recno_col = -1
-            for col in range(0, sheet.ncols):
+            for col in range(sheet.ncols):
                 column_name = sheet.cell_value(headers_row, col)
                 if column_name in columns:
                     columns_of_interest.append(col)
@@ -455,7 +453,7 @@ class MaccorExcelInputFile(MaccorInputFile):
                 if column_renames is not None and column_name in column_renames:
                     column_name = column_renames[column_name]
                 column_names.append(column_name)
-            for sheet_id in range(0, wbook.nsheets):
+            for sheet_id in range(wbook.nsheets):
                 self.logger.debug("Loading sheet..." + str(sheet_id))
                 sheet = wbook.sheet_by_index(sheet_id)
                 for row in range(headers_row + 1, sheet.nrows):
@@ -599,7 +597,7 @@ class MaccorRawInputFile(MaccorInputFile):
             line_bits = line.split("\t")
             if not len(line_bits) == 5:
                 raise UnsupportedFileTypeError
-            date_regex = "\d\d\/\d\d\/\d\d\d\d"
+            date_regex = r"\d\d\/\d\d\/\d\d\d\d"
             dates_regex = line_start + " " + date_regex + "  Date of Test:"
             if not re.match(dates_regex, line_bits[0]):
                 raise UnsupportedFileTypeError
@@ -618,7 +616,7 @@ class MaccorRawInputFile(MaccorInputFile):
                 raise UnsupportedFileTypeError
 
 
-class LogFilter(object):
+class LogFilter:
     def __init__(self, logger):
         self.logger = logger
 
@@ -655,10 +653,8 @@ def handle_recno(row, correct_number_of_columns, recno_col, row_idx):
             )
         else:
             raise InvalidDataInFileError(
-                (
-                    "There are more data columns than headers. "
-                    "Row {} has {} cols, expected {}"
-                ).format(row_idx, len(row), correct_number_of_columns)
+                "There are more data columns than headers. "
+                f"Row {row_idx} has {len(row)} cols, expected {correct_number_of_columns}"
             )
     elif recno_col >= 0:
         row[recno_col] = row[recno_col].replace(",", "")
