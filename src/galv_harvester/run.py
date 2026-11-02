@@ -8,17 +8,18 @@ import time
 import traceback
 
 from galv_harvester.plugins import get_parsers
-from .parse.exceptions import UnsupportedFileTypeError
-from .settings import (
-    get_logger,
-    get_setting,
-    HARVESTER_TASK_FILE_SIZE,
-    HARVEST_STAGE_COMPLETE,
-    HARVESTER_TASK_IMPORT,
-    HARVEST_STAGE_FAILED,
-)
+
 from .api import report_harvest_result, update_config
 from .harvest import HarvestProcessor
+from .parse.exceptions import UnsupportedFileTypeError
+from .settings import (
+    HARVEST_STAGE_COMPLETE,
+    HARVEST_STAGE_FAILED,
+    HARVESTER_TASK_FILE_SIZE,
+    HARVESTER_TASK_IMPORT,
+    get_logger,
+    get_setting,
+)
 
 logger = get_logger(__file__)
 

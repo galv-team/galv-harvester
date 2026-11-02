@@ -8,20 +8,14 @@ class UnsupportedFileTypeError(Exception):
     Exception indicating the file is unsupported
     """
 
-    pass
-
 
 class InvalidDataInFileError(Exception):
     """
     Exception indicating the file has invalid data
     """
 
-    pass
-
 
 class EmptyFileError(Exception):
     """
     Exception indicating the file has no data
     """
-
-    pass
