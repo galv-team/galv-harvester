@@ -3,18 +3,19 @@
 # of Oxford, and the 'Galv' Developers. All rights reserved.
 
 import json
+import time
+
+import requests
 
 from . import settings
-from .utils import NpEncoder
-import requests
 from .settings import (
+    get_logger,
     get_setting,
     get_settings,
     get_settings_file,
-    get_logger,
     update_envvars,
 )
-import time
+from .utils import NpEncoder
 
 logger = get_logger(__file__)
 
